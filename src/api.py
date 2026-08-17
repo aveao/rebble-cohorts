@@ -1,21 +1,12 @@
-import json
 from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
 from workers import fetch
 
 import firmware
 from config import var
-
-
-class SortedJSONResponse(JSONResponse):
-    """Sorts keys, as Flask's jsonify did, so responses stay byte-identical for
-    clients already in the field."""
-
-    def render(self, content: Any) -> bytes:
-        return json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
 
 
 async def optional_auth(
@@ -32,11 +23,7 @@ async def optional_auth(
     return await result.json()
 
 
-app = FastAPI(
-    title="cohorts",
-    description="The Rebble cohorts API",
-    default_response_class=SortedJSONResponse,
-)
+app = FastAPI(title="cohorts", description="The Rebble cohorts API")
 
 
 @dataclass
@@ -68,11 +55,8 @@ async def generate_fw(req: CohortRequest):
         raise HTTPException(400)
     kinds = ("normal", "recovery") if req.include_recovery else ("normal",)
 
-    response = {}
-    for kind in kinds:
-        row = await firmware.latest(req.db, req.hardware, kind)
-        if row is not None:
-            response[kind] = firmware.to_json(row)
+    rows = await firmware.latest_by_kind(req.db, req.hardware, kinds)
+    response = {kind: firmware.to_json(rows[kind]) for kind in kinds if kind in rows}
     if not response:
         raise HTTPException(400)
     return response

@@ -29,16 +29,25 @@ def to_json(row, archival: bool = False):
     return result
 
 
-async def latest(db, hardware, kind):
-    """Newest row for a (hardware, kind), which is how rollback works: submit an
-    older version with a newer timestamp."""
-    return await query_one(
+async def latest_by_kind(db, hardware, kinds):
+    """Newest row per kind for one hardware, as {kind: row}, in a single query.
+
+    Newest is how rollback works: submit an older version with a newer
+    timestamp. version breaks timestamp ties so the winner is at least stable.
+    """
+    placeholders = ", ".join("?" for _ in kinds)
+    rows = await query(
         db,
-        f"SELECT {COLUMNS} FROM firmwares"
-        " WHERE hardware = ? AND kind = ? ORDER BY timestamp DESC LIMIT 1",
+        f"SELECT {COLUMNS} FROM ("
+        f"  SELECT {COLUMNS},"
+        "     ROW_NUMBER() OVER (PARTITION BY kind ORDER BY timestamp DESC, version DESC) AS rn"
+        "   FROM firmwares"
+        f"  WHERE hardware = ? AND kind IN ({placeholders})"
+        ") WHERE rn = 1",
         hardware,
-        kind,
+        *kinds,
     )
+    return {row["kind"]: row for row in rows}
 
 
 async def all_rows(db):
