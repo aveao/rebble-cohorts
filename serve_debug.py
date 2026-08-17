@@ -1,8 +1,8 @@
-from cohorts import app
+import uvicorn
 
 
 def main():
-    app.run("0.0.0.0", 5000, debug=True)
+    uvicorn.run("cohorts:app", host="0.0.0.0", port=5000, reload=True)
 
 
 if __name__ == "__main__":

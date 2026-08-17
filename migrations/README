@@ -1,1 +1,2 @@
-Single-database configuration for Flask.
+Single-database Alembic configuration. Config lives in ../alembic.ini; the
+database URL comes from DATABASE_URL via cohorts.settings (see env.py).

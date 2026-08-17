@@ -3,9 +3,10 @@ import io
 import time
 
 import click
-from flask import cli as flask_cli
+from sqlalchemy import select
 
-from .models import Firmware, db
+from .db import SessionLocal
+from .models import Firmware
 from .settings import config
 
 MEMFAULT_API = "https://api.memfault.com/api/v0/releases/latest"
@@ -78,7 +79,6 @@ def _upload(data, s3_key):
     default=None,
     help="Memfault project key (falls back to MEMFAULT_TOKEN env).",
 )
-@flask_cli.with_appcontext
 def fetch_firmware_command(token):
     """Check Memfault for the latest firmware for each CoreDevice hardware,
     download + re-upload to our CDN, and upsert into the firmwares table."""
@@ -94,7 +94,7 @@ def fetch_firmware_command(token):
     added = 0
     skipped = 0
     failed = 0
-    with httpx.Client(follow_redirects=True, timeout=60.0) as client:
+    with httpx.Client(follow_redirects=True, timeout=60.0) as client, SessionLocal() as session:
         for hardware in CORE_DEVICES_DEVICES:
             click.echo(f"[{hardware}]: ", nl=False)
             try:
@@ -112,8 +112,8 @@ def fetch_firmware_command(token):
             notes = info.get("notes") or None
             artifact_url = info["artifacts"][0]["url"]
 
-            existing = Firmware.query.filter_by(
-                hardware=hardware, kind="normal", version=version
+            existing = session.scalars(
+                select(Firmware).filter_by(hardware=hardware, kind="normal", version=version)
             ).one_or_none()
             if existing is not None:
                 click.echo(f"{version} already in DB, skipping")
@@ -141,6 +141,7 @@ def fetch_firmware_command(token):
                 continue
 
             Firmware.upsert(
+                session,
                 hardware=hardware,
                 kind="normal",
                 version=version,
@@ -149,7 +150,7 @@ def fetch_firmware_command(token):
                 timestamp=int(time.time()),
                 notes=notes,
             )
-            db.session.commit()
+            session.commit()
             click.echo("OK")
             added += 1
 

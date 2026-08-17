@@ -21,8 +21,8 @@ Environment variables:
 ## Local development
 
 ```
-docker compose up --build                         # brings up postgres + app; auto-runs flask db upgrade
-docker compose exec app uv run flask import_json  # one-shot seed from config.json (first run only)
+docker compose up --build                            # brings up postgres + app; auto-runs alembic upgrade head
+docker compose exec app uv run cohorts import_json   # one-shot seed from config.json (first run only)
 ```
 
 The API is exposed on http://localhost:5000. Postgres data persists in the `cohorts-pg-data` named volume, run `docker compose down -v` if you want a fresh database.
@@ -42,7 +42,7 @@ To point `fetch_firmware` at it, export the matching env on the host before brin
 ```
 export MEMFAULT_TOKEN=<your key>
 docker compose --profile s3 restart app
-docker compose --profile s3 exec app uv run flask fetch_firmware
+docker compose --profile s3 exec app uv run cohorts fetch_firmware
 ```
 
 The MinIO bucket contents persist in the `cohorts-s3-data` named volume — `docker compose down -v` clears them along with Postgres.
@@ -60,7 +60,7 @@ First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed
 `config.json` is retained only as seed data for the initial import. After first boot, run:
 
 ```
-docker compose exec app uv run flask import_json
+docker compose exec app uv run cohorts import_json
 ```
 
 Re-running is idempotent — rows are upserted by `(hardware, kind, version)`.
@@ -70,7 +70,7 @@ Re-running is idempotent — rows are upserted by `(hardware, kind, version)`.
 First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed on insert, not on request.
 
 ```
-docker compose exec app uv run flask submit_firmware \
+docker compose exec app uv run cohorts submit_firmware \
     <hardware> <kind> <version> <url> <sha256> \
     [--timestamp <unix>] [--notes "<text>"]
 ```
@@ -82,17 +82,17 @@ docker compose exec app uv run flask submit_firmware \
 First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed on insert, not on request.
 
 ```
-docker compose exec app uv run flask fetch_firmware
+docker compose exec app uv run cohorts fetch_firmware
 ```
 
 Checks Memfault's `releases/latest` for each CoreDevice hardware (asterix, obelix_*, getafix_*, obelix_bb*), skips versions already recorded, and for each new one: streams the `.pbz` down while hashing it, uploads it to S3 at `{S3_PATH}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal` row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256. Idempotent and safe to run from cron. Requires `MEMFAULT_TOKEN`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, and `S3_BUCKET` in the environment (docker-compose forwards these from the host). Supports `--token`.
 
 ### Migrations
 
-`migrations/` is a standard Flask-Migrate / Alembic layout. `docker compose up` auto-applies pending migrations. To generate a new revision after editing models:
+`migrations/` is a standard Alembic layout, configured by `alembic.ini` at the repo root; `env.py` takes the database URL from `DATABASE_URL`. `docker compose up` auto-applies pending migrations. To generate a new revision after editing models:
 
 ```
-docker compose exec app uv run flask db migrate -m "<message>"
+docker compose exec app uv run alembic revision --autogenerate -m "<message>"
 ```
 
 Commit the generated file under `migrations/versions/`. Migrations are authored against Postgres, so generating them via compose (which runs against the compose-managed Postgres) keeps the revisions dialect-accurate.

@@ -1,7 +1,7 @@
 import os
 
 config = {
-    "SQLALCHEMY_DATABASE_URI": os.environ["DATABASE_URL"],
+    "DATABASE_URL": os.environ["DATABASE_URL"],
     "REBBLE_AUTH": os.environ.get("REBBLE_AUTH"),
     "FIRMWARE_ROOT": os.environ.get("FIRMWARE_ROOT", "https://binaries.rebble.io/fw"),
     "MEMFAULT_TOKEN": os.environ.get("MEMFAULT_TOKEN"),

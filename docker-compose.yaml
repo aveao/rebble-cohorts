@@ -17,8 +17,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://cohorts:cohorts@db:5432/cohorts
-      FLASK_APP: cohorts
-      # Passed through from the host so operators can invoke `flask fetch_firmware`
+      # Passed through from the host so operators can invoke `cohorts fetch_firmware`
       # via `docker compose exec`. Unset on the host -> unset in the container.
       MEMFAULT_TOKEN: ${MEMFAULT_TOKEN:-}
       AWS_ACCESS_KEY: ${AWS_ACCESS_KEY:-cohorts}
@@ -35,7 +34,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "uv run flask db upgrade && uv run python serve_debug.py"
+    command: sh -c "uv run alembic upgrade head && uv run python serve_debug.py"
 
   # Optional: `docker compose --profile s3 up` brings up a local S3-compatible
   # MinIO plus a one-shot sidecar that creates the `cohorts-binaries` bucket.

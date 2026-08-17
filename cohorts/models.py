@@ -1,20 +1,21 @@
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
-migrate = Migrate()
+from sqlalchemy import Index, Integer, String, Text, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class Firmware(db.Model):
+class Base(DeclarativeBase):
+    pass
+
+
+class Firmware(Base):
     __tablename__ = "firmwares"
 
-    hardware = db.Column(db.String, primary_key=True, nullable=False)
-    kind = db.Column(db.String, primary_key=True, nullable=False)
-    version = db.Column(db.String, primary_key=True, nullable=False)
-    url = db.Column(db.String, nullable=False)
-    sha256 = db.Column(db.String, nullable=False)
-    timestamp = db.Column(db.Integer, nullable=False)
-    notes = db.Column(db.Text, nullable=True)
+    hardware: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, primary_key=True)
+    version: Mapped[str] = mapped_column(String, primary_key=True)
+    url: Mapped[str] = mapped_column(String)
+    sha256: Mapped[str] = mapped_column(String)
+    timestamp: Mapped[int] = mapped_column(Integer)
+    notes: Mapped[str | None] = mapped_column(Text)
 
     def to_json(self, archival: bool = False):
         result = {
@@ -30,10 +31,12 @@ class Firmware(db.Model):
         return result
 
     @classmethod
-    def upsert(cls, hardware, kind, version, url, sha256, timestamp, notes):
-        existing = cls.query.filter_by(hardware=hardware, kind=kind, version=version).one_or_none()
+    def upsert(cls, session, hardware, kind, version, url, sha256, timestamp, notes):
+        existing = session.scalars(
+            select(cls).filter_by(hardware=hardware, kind=kind, version=version)
+        ).one_or_none()
         if existing is None:
-            db.session.add(
+            session.add(
                 cls(
                     hardware=hardware,
                     kind=kind,
@@ -51,15 +54,9 @@ class Firmware(db.Model):
             existing.notes = notes
 
 
-db.Index(
+Index(
     "ix_firmwares_hardware_kind_timestamp",
     Firmware.hardware,
     Firmware.kind,
     Firmware.timestamp.desc(),
 )
-
-
-def init_app(app):
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    db.init_app(app)
-    migrate.init_app(app, db)
