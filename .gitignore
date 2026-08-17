@@ -149,6 +149,12 @@ activemq-data/
 
 # Environments
 .env
+.dev.vars
+
+# Cloudflare Workers build artifacts
+python_modules/
+.venv-workers/
+.wrangler/
 .envrc
 .venv
 env/

@@ -2,14 +2,12 @@ import json
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from workers import fetch
 
-from .db import get_session
-from .models import Firmware
-from .settings import config
+import firmware
+from config import var
 
 
 class SortedJSONResponse(JSONResponse):
@@ -20,47 +18,34 @@ class SortedJSONResponse(JSONResponse):
         return json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
 
 
-router = APIRouter(default_response_class=SortedJSONResponse)
-
-
 async def optional_auth(
     request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> dict | None:
-    rebble_auth_host = config["REBBLE_AUTH"]
-    if not authorization or rebble_auth_host is None:
+    env = request.scope["env"]
+    rebble_auth_host = var(env, "REBBLE_AUTH")
+    if not authorization or not rebble_auth_host:
         return None
-    result = await request.app.state.http.get(
-        f"{rebble_auth_host}/api/v1/me", headers={"Authorization": authorization}
-    )
-    if result.status_code != 200:
+    result = await fetch(f"{rebble_auth_host}/api/v1/me", headers={"Authorization": authorization})
+    if result.status != 200:
         raise HTTPException(401)
-    return result.json()
+    return await result.json()
+
+
+app = FastAPI(
+    title="cohorts",
+    description="The Rebble cohorts API",
+    default_response_class=SortedJSONResponse,
+)
 
 
 @dataclass
 class CohortRequest:
     """Everything a generator is allowed to look at, resolved once per request."""
 
-    session: AsyncSession
+    db: Any
     hardware: str | None
     include_recovery: bool
-
-
-async def _latest_firmware(session, hardware, kind):
-    return await session.scalar(
-        select(Firmware)
-        .filter_by(hardware=hardware, kind=kind)
-        .order_by(Firmware.timestamp.desc())
-        .limit(1)
-    )
-
-
-async def _all_firmware(session):
-    result = await session.scalars(
-        select(Firmware).order_by(Firmware.kind, Firmware.timestamp.desc())
-    )
-    return result.all()
 
 
 async def generate_pipeline_api(req: CohortRequest):
@@ -85,16 +70,16 @@ async def generate_fw(req: CohortRequest):
 
     response = {}
     for kind in kinds:
-        row = await _latest_firmware(req.session, req.hardware, kind)
+        row = await firmware.latest(req.db, req.hardware, kind)
         if row is not None:
-            response[kind] = row.to_json()
+            response[kind] = firmware.to_json(row)
     if not response:
         raise HTTPException(400)
     return response
 
 
 async def generate_fw_all(req: CohortRequest):
-    return [row.to_json(archival=True) for row in await _all_firmware(req.session)]
+    return [firmware.to_json(row, archival=True) for row in await firmware.all_rows(req.db)]
 
 
 generators = {
@@ -106,9 +91,9 @@ generators = {
 }
 
 
-@router.get("/cohort", dependencies=[Depends(optional_auth)])
+@app.get("/cohort", dependencies=[Depends(optional_auth)])
 async def cohort(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    request: Request,
     select: str | None = None,
     hardware: str | None = None,
     includeRecovery: str | None = None,
@@ -118,7 +103,7 @@ async def cohort(
     if select is None:
         raise HTTPException(400)
     req = CohortRequest(
-        session=session,
+        db=request.scope["env"].DB,
         hardware=hardware,
         include_recovery=includeRecovery == "true",
     )
@@ -131,7 +116,7 @@ async def cohort(
     return response
 
 
-@router.get("/heartbeat", response_class=PlainTextResponse)
-@router.get("/cohorts/heartbeat", response_class=PlainTextResponse)
+@app.get("/heartbeat", response_class=PlainTextResponse)
+@app.get("/cohorts/heartbeat", response_class=PlainTextResponse)
 async def heartbeat():
     return "ok"

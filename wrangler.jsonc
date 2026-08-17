@@ -1,0 +1,42 @@
+{
+  "name": "cohorts",
+  "main": "src/entry.py",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["python_workers"],
+  "observability": { "enabled": true },
+
+  // FIRMWARE_ROOT is the public base URL for firmware blobs, and must line up
+  // with whatever custom domain is attached to the R2 bucket below: the cron
+  // writes objects at R2_PREFIX/<hardware>/<file> and stores
+  // FIRMWARE_ROOT/<hardware>/<file> in the database. REBBLE_AUTH empty means
+  // Authorization headers on /cohort are ignored, as before.
+  "vars": {
+    "FIRMWARE_ROOT": "https://binaries.rebble.io/fw",
+    "REBBLE_AUTH": "",
+    "R2_PREFIX": "fw/"
+  },
+
+  // MEMFAULT_TOKEN is a secret, not a var: npx wrangler secret put MEMFAULT_TOKEN
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cohorts",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "BINARIES",
+      "bucket_name": "rebble-binaries"
+    }
+  ],
+
+  // Hourly. Keep the interval at 1 hour or longer: cron invocations at shorter
+  // intervals are capped at 30s CPU, while >=1h gets 15 minutes.
+  "triggers": {
+    "crons": ["0 * * * *"]
+  }
+}

@@ -1,51 +1,59 @@
 # rebble-cohorts
+
 cohorts.rebble.io: The Rebble cohorts API. It handles firmware delivery.
+
+Runs as a Cloudflare Python Worker: FastAPI behind the runtime's ASGI adapter,
+D1 for firmware metadata, R2 for the firmware blobs, and a cron trigger for the
+Memfault poll.
 
 For archival, use `/cohort?select=fw-all`, which returns a list of all stored firmware.
 
 ## Configuration
 
-Environment variables:
+Vars live in `wrangler.jsonc`; secrets are set with `npx wrangler secret put <NAME>`.
+For local development, copy `.dev.vars.example` to `.dev.vars`.
 
-| Variable | Required | Default | Purpose |
+| Name | Kind | Default | Purpose |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | yes | — | SQLAlchemy DB URL, e.g. `postgresql+psycopg://user:pw@host:5432/cohorts` |
-| `FIRMWARE_ROOT` | no | `https://binaries.rebble.io/fw` | Base URL used by `import_json` and `fetch_firmware` to build `.pbz` URLs |
-| `REBBLE_AUTH` | no | — | Rebble auth service URL; if unset, `Authorization` headers on `/cohort` are ignored |
-| `MEMFAULT_TOKEN` | for `fetch_firmware` | — | Memfault project key |
-| `AWS_ACCESS_KEY` / `AWS_SECRET_KEY` | for `fetch_firmware` | `cohorts` / `cohortscohorts` | S3 creds for re-uploading firmware blobs |
-| `S3_BUCKET` | for `fetch_firmware` | `rebble-binaries` | Target bucket |
-| `S3_PATH` | no | `fw/` | Key prefix inside `S3_BUCKET` (must align with the tail of `FIRMWARE_ROOT`) |
-| `S3_ENDPOINT` | no | `http://s3:9000` | Custom S3 endpoint URL |
+| `DB` | D1 binding | — | Firmware metadata database |
+| `BINARIES` | R2 binding | — | Bucket holding the `.pbz` blobs |
+| `FIRMWARE_ROOT` | var | `https://binaries.rebble.io/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
+| `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
+| `REBBLE_AUTH` | var | empty | Rebble auth service URL; if empty, `Authorization` headers on `/cohort` are ignored |
+| `MEMFAULT_TOKEN` | secret | — | Memfault project key, required by the cron |
+| `MEMFAULT_API` | var | Memfault's public API | Override only to point the cron at a stand-in while developing |
 
 ## Local development
 
-```
-docker compose up --build                            # brings up postgres + app; auto-runs alembic upgrade head
-docker compose exec app uv run cohorts import_json   # one-shot seed from config.json (first run only)
-```
-
-The API is exposed on http://localhost:5000. Postgres data persists in the `cohorts-pg-data` named volume, run `docker compose down -v` if you want a fresh database.
-
-### Optional: fake S3 for upload testing
-
-The `s3` compose profile brings up a local MinIO container plus a one-shot sidecar that pre-creates a `cohorts-binaries` bucket, so the `fetch_firmware` upload path can be exercised without real S3 credentials:
+Requires uv >= 0.12.3 (pywrangler enforces this) and Node for `wrangler`.
 
 ```
-docker compose --profile s3 up -d
+uv sync
+uv run pywrangler dev                                    # http://localhost:8787
+npx wrangler d1 migrations apply cohorts --local         # create the schema
+uv run tools/cli.py import_json > seed.sql               # seed from config.json
+npx wrangler d1 execute cohorts --local --file=seed.sql
 ```
 
-Admin console at http://localhost:59001 (user `cohorts`, pass `cohortscohorts`). The S3 API itself is only reachable from inside the compose network at `http://s3:9000` — it is not forwarded to the host.
-
-To point `fetch_firmware` at it, export the matching env on the host before bringing the stack up (or `docker compose --profile s3 restart app` to pick up changes), then run the command as usual:
+D1 and R2 are emulated locally and persist under `.wrangler/`. Cron triggers do
+not fire on a schedule locally; run one by hand:
 
 ```
-export MEMFAULT_TOKEN=<your key>
-docker compose --profile s3 restart app
-docker compose --profile s3 exec app uv run cohorts fetch_firmware
+curl http://localhost:8787/cdn-cgi/handler/scheduled
 ```
 
-The MinIO bucket contents persist in the `cohorts-s3-data` named volume — `docker compose down -v` clears them along with Postgres.
+## Deploying
+
+```
+npx wrangler d1 create cohorts                     # then put the id in wrangler.jsonc
+npx wrangler r2 bucket create rebble-binaries
+npx wrangler d1 migrations apply cohorts --remote
+npx wrangler secret put MEMFAULT_TOKEN
+uv run pywrangler deploy
+```
+
+Attach a custom domain to the R2 bucket matching `FIRMWARE_ROOT`, so the URLs
+recorded in the database resolve to the blobs the cron uploads.
 
 ## Firmware data
 
@@ -53,46 +61,60 @@ Firmware rows live in the `firmwares` table, keyed by `(hardware, kind, version)
 
 By default `/cohort?select=fw&hardware=<hw>` returns only `normal`. Pass `&includeRecovery=true` to additionally include the latest `recovery` row; only the literal string `true` is recognized, anything else (including absent) is treated as false. If none of the requested kinds yield a row, `/cohort` responds 400.
 
-### Seeding from config.json
+### Admin commands
 
-First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed on insert, not on request.
+A Worker has no CLI, so the management commands run locally and emit SQL you
+feed to wrangler. Drop `--remote` to apply against the local dev database.
 
-`config.json` is retained only as seed data for the initial import. After first boot, run:
-
-```
-docker compose exec app uv run cohorts import_json
-```
-
-Re-running is idempotent — rows are upserted by `(hardware, kind, version)`.
-
-### Adding or updating a firmware
-
-First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed on insert, not on request.
+Seeding from `config.json` (retained only as seed data for the initial import),
+which is idempotent — rows are upserted by `(hardware, kind, version)`:
 
 ```
-docker compose exec app uv run cohorts submit_firmware \
-    <hardware> <kind> <version> <url> <sha256> \
-    [--timestamp <unix>] [--notes "<text>"]
+uv run tools/cli.py import_json > seed.sql
+npx wrangler d1 execute cohorts --remote --file=seed.sql
 ```
 
-`kind` must be `normal` or `recovery`. `--timestamp` defaults to now. Re-running with the same `(hardware, kind, version)` upserts; submitting with a fresh timestamp is how you roll forward or back.
+Adding or updating a single firmware. `kind` must be `normal` or `recovery`,
+and `--timestamp` defaults to now:
+
+```
+uv run tools/cli.py submit_firmware <hardware> <kind> <version> <url> <sha256> \
+    [--timestamp <unix>] [--notes "<text>"] > fw.sql
+npx wrangler d1 execute cohorts --remote --file=fw.sql
+```
+
+Both build URLs from `--firmware-root` (default `https://binaries.rebble.io/fw`),
+so make sure it matches the Worker's `FIRMWARE_ROOT`. URLs are formed on insert,
+not on request.
 
 ### Fetching CoreDevice firmware from Memfault
 
-First, make sure that your `FIRMWARE_ROOT` is set correctly. The URLs are formed on insert, not on request.
+The cron trigger in `wrangler.jsonc` runs this hourly; `src/memfault.py` holds
+the logic. It checks Memfault's `releases/latest` for each CoreDevice hardware
+(asterix, obelix_*, getafix_*), skips versions already recorded, and for each new
+one downloads the `.pbz` while hashing it, uploads it to R2 at
+`{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal`
+row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256.
 
-```
-docker compose exec app uv run cohorts fetch_firmware
-```
-
-Checks Memfault's `releases/latest` for each CoreDevice hardware (asterix, obelix_*, getafix_*, obelix_bb*), skips versions already recorded, and for each new one: streams the `.pbz` down while hashing it, uploads it to S3 at `{S3_PATH}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal` row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256. Idempotent and safe to run from cron. Requires `MEMFAULT_TOKEN`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, and `S3_BUCKET` in the environment (docker-compose forwards these from the host). Supports `--token`.
+Keep the cron interval at an hour or longer: Cloudflare caps cron invocations at
+30s CPU below an hourly interval, versus 15 minutes at an hour or above.
 
 ### Migrations
 
-`migrations/` is a standard Alembic layout, configured by `alembic.ini` at the repo root; `env.py` takes the database URL from `DATABASE_URL`. `docker compose up` auto-applies pending migrations. To generate a new revision after editing models:
+`migrations/` holds plain SQL applied by `wrangler d1 migrations apply`, which
+tracks what it has run in a `d1_migrations` table. Add a new one with:
 
 ```
-docker compose exec app uv run alembic revision --autogenerate -m "<message>"
+npx wrangler d1 migrations create cohorts "<message>"
 ```
 
-Commit the generated file under `migrations/versions/`. Migrations are authored against Postgres, so generating them via compose (which runs against the compose-managed Postgres) keeps the revisions dialect-accurate.
+## Notes on the runtime
+
+- Outbound HTTP must go through the runtime's `fetch` (`from workers import fetch`).
+  `httpx` is nominally supported but falls back to raw TCP sockets, which the
+  Workers runtime does not provide, and fails with `NotImplementedError`.
+- The `scheduled(self, controller, env, ctx)` handler receives `env` as `None`;
+  the bindings are on `self.env`.
+- `requires-python` in pyproject.toml governs the local tooling venv only.
+  pywrangler resolves the Worker's own interpreter and dependencies into
+  `pylock.toml` (currently Python 3.13).

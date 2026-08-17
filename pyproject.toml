@@ -3,34 +3,32 @@ name = "cohorts"
 version = "0.1.0"
 description = "The Rebble cohorts API"
 readme = "README.md"
-requires-python = "~=3.14.0"
+# Applies to the local tooling env only; pywrangler resolves the Worker's own
+# interpreter and dependencies separately (see pylock.toml).
+requires-python = "==3.12.*"
+# Worker runtime dependencies only — these get bundled into the deployed Worker,
+# so keep the list short. Outbound HTTP goes through the runtime's own fetch
+# (workers SDK, shipped with the runtime) rather than httpx, which falls back to
+# raw TCP sockets that the Workers runtime does not provide. Local tooling
+# belongs in dependency-groups below, and tools/cli.py declares its own deps
+# inline (PEP 723).
 dependencies = [
-    "alembic>=1.16",
-    "boto3>=1.35.0",
-    "click>=8.1",
     "fastapi>=0.120",
-    "httpx>=0.28.1",
-    "psycopg[binary]>=3.2.0",
-    "sqlalchemy>=2.0.36",
-    "uvicorn[standard]>=0.38",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [tool.uv]
-required-version = ">=0.9.17"
+# pywrangler requires uv >= 0.12.3.
+required-version = ">=0.12.3"
 exclude-newer = "3 days"
+package = false
 
 [tool.ruff]
 line-length = 100
+# pywrangler vendors the worker's dependencies into these on build.
+extend-exclude = ["python_modules", ".venv-workers"]
 
 [dependency-groups]
 dev = [
     "ruff>=0.15.10",
+    "workers-py>=1.16",
 ]
-
-[project.scripts]
-cohorts = "cohorts.cli:cli"
-debug_server = "serve_debug:main"
