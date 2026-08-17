@@ -114,15 +114,28 @@ not on request.
 
 ### Fetching CoreDevice firmware from Memfault
 
-The cron trigger in `wrangler.jsonc` runs this hourly; `src/memfault.py` holds
-the logic. It checks Memfault's `releases/latest` for each CoreDevice hardware
-(asterix, obelix_*, getafix_*), skips versions already recorded, and for each new
-one downloads the `.pbz` while hashing it, uploads it to R2 at
+`src/memfault.py` holds the logic. For a device it checks Memfault's
+`releases/latest`, skips the version if already recorded, and otherwise
+downloads the `.pbz` while hashing it, uploads it to R2 at
 `{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal`
 row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256.
 
-Keep the cron interval at an hour or longer: Cloudflare caps cron invocations at
+There is one cron per CoreDevice, staggered ten minutes apart, so an invocation
+downloads and hashes at most one firmware. `CRON_DEVICES` in `src/memfault.py`
+maps each expression to its device and has to match `triggers.crons` in
+`wrangler.jsonc`; an expression missing from the map polls every device rather
+than silently skipping any. The schedules are staggered because
+`controller.cron` identifies a schedule by its expression, so duplicates would
+be indistinguishable.
+
+Keep each expression at an hour or longer: Cloudflare caps cron invocations at
 30s CPU below an hourly interval, versus 15 minutes at an hour or above.
+
+Trigger one locally by passing the expression:
+
+```
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+*+*+*+*"
+```
 
 ### Migrations
 
