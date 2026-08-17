@@ -141,6 +141,19 @@ tracks what it has run in a `d1_migrations` table. Add a new one with:
 npx wrangler d1 migrations create cohorts "<message>"
 ```
 
+## Caching
+
+`/cohort` responses carry `Cache-Control: public, max-age=0, s-maxage=300`, and
+`src/entry.py` checks `caches.default` before handing the request to the ASGI
+app. Workers run in front of the cache, so a hit still costs an invocation, but
+it skips FastAPI, D1 and serialisation — locally that halves the request.
+
+`s-maxage` scopes the caching to the edge; `max-age=0` means clients do not hold
+a copy, so watches keep asking and only Cloudflare has one. Only 200s with that
+header are stored, which leaves `/heartbeat` and the 400s uncached. Change the
+window with `CACHE_CONTROL` in `src/api.py`: it bounds how long a firmware the
+cron has just published can sit unseen behind a cached response.
+
 ## Notes on the runtime
 
 - Outbound HTTP must go through the runtime's `fetch` (`from workers import fetch`).

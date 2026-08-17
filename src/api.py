@@ -6,6 +6,12 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 import firmware
 
+# s-maxage caches at the edge for five minutes; max-age=0 leaves clients
+# uncached, so watches keep asking and only the edge holds a copy. Firmware
+# changes at most hourly, when the cron publishes, so this bounds how long a new
+# release can sit unseen behind a cached response.
+CACHE_CONTROL = "public, max-age=0, s-maxage=300"
+
 # No docs routes: this API has three endpoints and no consumer for a schema, and
 # keeping them out spares the route table and the deploy-time snapshot.
 app = FastAPI(
@@ -90,8 +96,9 @@ async def cohort(
         response[entry] = await generators[entry](req)
     # Returning a Response rather than a dict skips FastAPI's jsonable_encoder
     # and response-model handling, which is worth about a millisecond on the 68
-    # rows of fw-all.
-    return JSONResponse(response)
+    # rows of fw-all. The Cache-Control header is what opts this response into
+    # the edge cache in entry.py.
+    return JSONResponse(response, headers={"Cache-Control": CACHE_CONTROL})
 
 
 @app.get("/heartbeat")
