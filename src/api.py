@@ -30,6 +30,7 @@ class CohortRequest:
     db: Any
     hardware: str | None
     include_recovery: bool
+    source: str | None
 
 
 async def generate_pipeline_api(req: CohortRequest):
@@ -52,7 +53,7 @@ async def generate_fw(req: CohortRequest):
         raise HTTPException(400)
     kinds = ("normal", "recovery") if req.include_recovery else ("normal",)
 
-    rows = await firmware.latest_by_kind(req.db, req.hardware, kinds)
+    rows = await firmware.latest_by_kind(req.db, req.hardware, kinds, req.source)
     response = {kind: firmware.to_json(rows[kind]) for kind in kinds if kind in rows}
     if not response:
         raise HTTPException(400)
@@ -60,7 +61,8 @@ async def generate_fw(req: CohortRequest):
 
 
 async def generate_fw_all(req: CohortRequest):
-    return [firmware.to_json(row, archival=True) for row in await firmware.all_rows(req.db)]
+    rows = await firmware.all_rows(req.db, req.source)
+    return [firmware.to_json(row, archival=True) for row in rows]
 
 
 generators = {
@@ -78,15 +80,18 @@ async def cohort(
     select: str | None = None,
     hardware: str | None = None,
     includeRecovery: str | None = None,
+    source: str | None = None,
 ):
     # These are 400s rather than FastAPI's default 422 because watches in the
     # field expect the Flask behaviour of a missing query arg being a 400.
     if select is None:
         raise HTTPException(400)
+    # An absent source means the canonical firmware, stored with source NULL.
     req = CohortRequest(
         db=request.scope["env"].DB,
         hardware=hardware,
         include_recovery=includeRecovery == "true",
+        source=source,
     )
 
     response = {}

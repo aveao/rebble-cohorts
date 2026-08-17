@@ -24,9 +24,9 @@ import click
 VALID_FW_KINDS = ("normal", "recovery")
 DEFAULT_FIRMWARE_ROOT = "https://cohorts-storage.lavate.ch/fw"
 
-UPSERT = """INSERT INTO firmwares (hardware, kind, version, url, sha256, timestamp, notes)
+UPSERT = """INSERT INTO firmwares (hardware, kind, version, url, sha256, timestamp, notes, source)
 VALUES ({values})
-ON CONFLICT (hardware, kind, version) DO UPDATE SET
+ON CONFLICT (hardware, kind, version, COALESCE(source, '')) DO UPDATE SET
     url = excluded.url, sha256 = excluded.sha256,
     timestamp = excluded.timestamp, notes = excluded.notes;"""
 
@@ -39,9 +39,9 @@ def _literal(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def _upsert_sql(hardware, kind, version, url, sha256, timestamp, notes):
+def _upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source=None):
     values = ", ".join(
-        _literal(v) for v in (hardware, kind, version, url, sha256, timestamp, notes)
+        _literal(v) for v in (hardware, kind, version, url, sha256, timestamp, notes, source)
     )
     return UPSERT.format(values=values)
 
@@ -89,13 +89,19 @@ def import_json_command(firmware_root, config_path):
 @click.argument("sha256")
 @click.option("--timestamp", type=int, default=None, help="Unix timestamp (default: now).")
 @click.option("--notes", default=None, help="Release notes (optional).")
-def submit_firmware_command(hardware, kind, version, url, sha256, timestamp, notes):
+@click.option(
+    "--source",
+    default=None,
+    help="Build track, e.g. 'beta'. Omit for the canonical firmware, which is what "
+    "/cohort serves when no ?source= is given.",
+)
+def submit_firmware_command(hardware, kind, version, url, sha256, timestamp, notes, source):
     """Add or update a single firmware row."""
     if kind not in VALID_FW_KINDS:
         raise click.BadParameter(f"kind must be one of {VALID_FW_KINDS}, got {kind!r}")
     if timestamp is None:
         timestamp = int(time.time())
-    click.echo(_upsert_sql(hardware, kind, version, url, sha256, timestamp, notes))
+    click.echo(_upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source))
 
 
 if __name__ == "__main__":

@@ -85,6 +85,33 @@ Firmware rows live in the `firmwares` table, keyed by `(hardware, kind, version)
 
 By default `/cohort?select=fw&hardware=<hw>` returns only `normal`. Pass `&includeRecovery=true` to additionally include the latest `recovery` row; only the literal string `true` is recognized, anything else (including absent) is treated as false. If none of the requested kinds yield a row, `/cohort` responds 400.
 
+### Sources
+
+A row's `source` names the build track it came from. `NULL` is the canonical
+firmware and is what a request without `&source=` gets; anything else is a
+parallel track a client opts into:
+
+```
+/cohort?select=fw&hardware=snowy_dvt                  # canonical
+/cohort?select=fw&hardware=snowy_dvt&source=beta      # the beta track
+/cohort?select=fw-all&source=coredevices-github       # everything on that track
+```
+
+Tracks are independent: `latest` is resolved per source, so a track publishing
+an older version does not affect the canonical one, and an unknown source has no
+rows and therefore 400s exactly as an unknown hardware does. `source` is
+included in the `fw-all` archival rows; the `fw` payload is unchanged, so
+watches see the same shape as before. Cached responses key off the full URL, so
+each source caches separately.
+
+Two sources may publish the same version for the same hardware — identity is
+`(hardware, kind, version, source)`, enforced by a unique index over
+`COALESCE(source, '')` because SQLite treats NULLs as distinct.
+
+Nothing writes a non-NULL source yet: the Memfault cron still publishes
+canonical rows, and other tracks are populated by hand with
+`tools/cli.py submit_firmware --source`.
+
 ### Admin commands
 
 A Worker has no CLI, so the management commands run locally and emit SQL you
