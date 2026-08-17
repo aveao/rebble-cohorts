@@ -34,7 +34,7 @@
   "r2_buckets": [
     {
       "binding": "BINARIES",
-      "bucket_name": "rebble-binaries"
+      "bucket_name": "cohorts"
     }
   ],
 

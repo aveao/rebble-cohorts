@@ -45,7 +45,7 @@ curl http://localhost:8787/cdn-cgi/handler/scheduled
 ## Deploying
 
 ```
-npx wrangler r2 bucket create rebble-binaries
+npx wrangler r2 bucket create cohorts
 uv run pywrangler deploy                           # provisions the D1 database
 npx wrangler d1 migrations apply cohorts --remote
 npx wrangler secret put MEMFAULT_TOKEN
