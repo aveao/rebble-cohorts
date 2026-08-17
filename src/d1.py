@@ -1,13 +1,9 @@
 """Thin helpers over the D1 binding.
 
-D1 is reached through the Workers binding (env.DB), which returns JavaScript
-objects; everything here hands back plain Python dicts so the rest of the code
-never touches a JsProxy.
+The workers SDK wraps the binding, so results arrive as dict-like views over the
+JavaScript objects rather than raw JsProxies. Copying each row into a real dict
+here keeps the rest of the code on plain Python values.
 """
-
-
-def _to_py(value):
-    return value.to_py() if hasattr(value, "to_py") else value
 
 
 def _statement(db, sql, params):
@@ -18,15 +14,13 @@ def _statement(db, sql, params):
 async def query(db, sql, *params):
     """Run a SELECT and return every row as a dict."""
     result = await _statement(db, sql, params).all()
-    return [dict(_to_py(row)) for row in _to_py(result.results)]
+    return [dict(row) for row in result.results]
 
 
 async def query_one(db, sql, *params):
     """Run a SELECT and return the first row, or None."""
     row = await _statement(db, sql, params).first()
-    if row is None:
-        return None
-    return dict(_to_py(row))
+    return None if row is None else dict(row)
 
 
 async def execute(db, sql, *params):
