@@ -119,21 +119,17 @@ downloads the `.pbz` while hashing it, uploads it to R2 at
 `{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal`
 row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256.
 
-There is one cron per CoreDevice, staggered ten minutes apart, so an invocation
-downloads and hashes at most one firmware. `CRON_DEVICES` in `src/memfault.py`
-maps each expression to its device and has to match `triggers.crons` in
-`wrangler.jsonc`; an expression missing from the map polls every device rather
-than silently skipping any. The schedules are staggered because
-`controller.cron` identifies a schedule by its expression, so duplicates would
-be indistinguishable.
+One hourly cron polls every device in a single invocation. Hashing is the only
+part that costs meaningful CPU, and it only happens for a version that is
+actually new, so a run where nothing has been published does almost no work.
 
-Keep each expression at an hour or longer: Cloudflare caps cron invocations at
-30s CPU below an hourly interval, versus 15 minutes at an hour or above.
+Keep the interval at an hour or longer: Cloudflare caps cron invocations at 30s
+CPU below an hourly interval, versus 15 minutes at an hour or above.
 
-Trigger one locally by passing the expression:
+Trigger a run locally:
 
 ```
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+*+*+*+*"
+curl http://localhost:8787/cdn-cgi/handler/scheduled
 ```
 
 ### Migrations

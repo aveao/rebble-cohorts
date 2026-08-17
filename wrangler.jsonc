@@ -36,20 +36,10 @@
     }
   ],
 
-  // One schedule per CoreDevice, so each invocation downloads and hashes at
-  // most one firmware. src/memfault.py maps these expressions to devices and
-  // must be kept in sync. Each is still hourly, which matters: cron invocations
-  // at intervals under an hour are capped at 30s CPU, an hour or more gets 15
-  // minutes. They are staggered rather than simultaneous because the expression
-  // is what identifies the schedule, so duplicates could not be told apart.
+  // Hourly, polling every CoreDevice in the one invocation. Keep the interval
+  // at an hour or longer: cron invocations at shorter intervals are capped at
+  // 30s CPU, while >=1h gets 15 minutes.
   "triggers": {
-    "crons": [
-      "0 * * * *",
-      "10 * * * *",
-      "20 * * * *",
-      "30 * * * *",
-      "40 * * * *",
-      "50 * * * *"
-    ]
+    "crons": ["0 * * * *"]
   }
 }

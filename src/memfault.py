@@ -19,26 +19,17 @@ from config import var
 
 MEMFAULT_API = "https://api.memfault.com/api/v0/releases/latest"
 
-# One cron per device, so each invocation only ever downloads and hashes a
-# single firmware. The schedules are staggered rather than simultaneous because
-# controller.cron reports the expression that fired, and identical expressions
-# would be indistinguishable. Keep in sync with triggers.crons in
-# wrangler.jsonc; an expression missing from here falls back to every device.
-#
-# The keys of the map are Core Devices hardware revisions. These short names are
-# both the `hardware` value we store in the firmwares table and the
-# `hardware_version` string Memfault expects. Based on the mobileapp
-# WatchHardwarePlatform.
-CRON_DEVICES = {
-    "0 * * * *": "asterix",
-    "10 * * * *": "obelix_evt",
-    "20 * * * *": "obelix_dvt",
-    "30 * * * *": "obelix_pvt",
-    "40 * * * *": "getafix_evt",
-    "50 * * * *": "getafix_dvt",
-}
-
-CORE_DEVICES_DEVICES = tuple(CRON_DEVICES.values())
+# Core Devices hardware revisions. These short names are both the `hardware`
+# value we store in the firmwares table and the `hardware_version` string
+# Memfault expects. Based on the mobileapp WatchHardwarePlatform.
+CORE_DEVICES_DEVICES = (
+    "asterix",
+    "obelix_evt",
+    "obelix_dvt",
+    "obelix_pvt",
+    "getafix_evt",
+    "getafix_dvt",
+)
 
 
 class FetchError(Exception):
@@ -98,8 +89,7 @@ async def _upload(env, key, data):
     await env.BINARIES.put(key, data, options)
 
 
-async def fetch_firmware(env, device=None):
-    """Poll Memfault for one device, or for every device when device is None."""
+async def fetch_firmware(env):
     token = var(env, "MEMFAULT_TOKEN")
     if not token:
         raise RuntimeError("MEMFAULT_TOKEN not set (npx wrangler secret put MEMFAULT_TOKEN).")
@@ -110,7 +100,7 @@ async def fetch_firmware(env, device=None):
     added = 0
     skipped = 0
     failed = 0
-    for hardware in (device,) if device else CORE_DEVICES_DEVICES:
+    for hardware in CORE_DEVICES_DEVICES:
         try:
             info = await _fetch_latest(api, token, hardware)
         except FetchError as e:
