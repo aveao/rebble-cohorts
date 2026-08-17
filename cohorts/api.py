@@ -1,8 +1,6 @@
 from functools import wraps
 
-import beeline
-import beeline.patch.requests  # noqa: F401 - needed in this order to monkeypatch requests
-import requests
+import httpx
 from flask import Blueprint, abort, current_app, jsonify, request
 
 from .models import Firmware
@@ -17,7 +15,7 @@ def optional_auth(fn):
         user = None
         rebble_auth_host = current_app.config["REBBLE_AUTH"]
         if auth and rebble_auth_host is not None:
-            result = requests.get(f"{rebble_auth_host}/api/v1/me", headers={"Authorization": auth})
+            result = httpx.get(f"{rebble_auth_host}/api/v1/me", headers={"Authorization": auth})
             if result.status_code != 200:
                 abort(401)
             user = result.json()
@@ -38,29 +36,11 @@ def _all_firmware():
     return Firmware.query.order_by(Firmware.kind, Firmware.timestamp.desc()).all()
 
 
-FW_BEELINE_FIELDS = {
-    "mobilePlatform": "user.mobile_platform",
-    "mobileVersion": "user.mobile_version",
-    "mobileHardware": "user.mobile_hardware",
-    "pebbleAppVersion": "user.pebble_app_version",
-}
-
-
-def _add_fw_beeline_context(hardware: str | None = None):
-    if hardware:
-        beeline.add_context_field("user.hardware", hardware)
-    for arg_name, field_name in FW_BEELINE_FIELDS.items():
-        value = request.args.get(arg_name)
-        if value is not None:
-            beeline.add_context_field(field_name, value)
-
-
 def generate_fw():
     include_recovery = request.args.get("includeRecovery") == "true"
     kinds = ("normal", "recovery") if include_recovery else ("normal",)
 
     hardware = request.args["hardware"]
-    _add_fw_beeline_context(hardware)
 
     response = {}
     for kind in kinds:
@@ -73,7 +53,6 @@ def generate_fw():
 
 
 def generate_fw_all():
-    _add_fw_beeline_context()
     response = [row.to_json(archival=True) for row in _all_firmware()]
     return response
 
@@ -93,8 +72,6 @@ generators = {
 @api.route("/cohort")
 @optional_auth
 def cohort(user):
-    if user and "uid" in user:
-        beeline.add_context_field("user", user["uid"])
     select = request.args["select"].split(",")
     response = {}
     for entry in select:

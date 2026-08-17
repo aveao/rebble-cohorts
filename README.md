@@ -11,7 +11,6 @@ Environment variables:
 | --- | --- | --- | --- |
 | `DATABASE_URL` | yes | — | SQLAlchemy DB URL, e.g. `postgresql+psycopg://user:pw@host:5432/cohorts` |
 | `FIRMWARE_ROOT` | no | `https://binaries.rebble.io/fw` | Base URL used by `import_json` and `fetch_firmware` to build `.pbz` URLs |
-| `HONEYCOMB_KEY` | no | — | Honeycomb write key; beeline disabled if unset |
 | `REBBLE_AUTH` | no | — | Rebble auth service URL; if unset, `Authorization` headers on `/cohort` are ignored |
 | `MEMFAULT_TOKEN` | for `fetch_firmware` | — | Memfault project key |
 | `AWS_ACCESS_KEY` / `AWS_SECRET_KEY` | for `fetch_firmware` | `cohorts` / `cohortscohorts` | S3 creds for re-uploading firmware blobs |
