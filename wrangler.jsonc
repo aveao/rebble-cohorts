@@ -18,15 +18,19 @@
 
   // MEMFAULT_TOKEN is a secret, not a var: npx wrangler secret put MEMFAULT_TOKEN
 
+  // No database_id: wrangler provisions the database on first deploy and writes
+  // the id back here. The binding stays linked on later deploys either way.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "cohorts",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
       "migrations_dir": "migrations"
     }
   ],
 
+  // bucket_name is explicit because it is public-facing — a custom domain points
+  // at it and firmware URLs are stored in the database. Omitting it would let
+  // wrangler provision a bucket under a generated, worker-prefixed name instead.
   "r2_buckets": [
     {
       "binding": "BINARIES",

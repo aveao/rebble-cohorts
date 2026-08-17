@@ -45,14 +45,19 @@ curl http://localhost:8787/cdn-cgi/handler/scheduled
 ## Deploying
 
 ```
-npx wrangler d1 create cohorts                     # then put the id in wrangler.jsonc
 npx wrangler r2 bucket create rebble-binaries
+uv run pywrangler deploy                           # provisions the D1 database
 npx wrangler d1 migrations apply cohorts --remote
 npx wrangler secret put MEMFAULT_TOKEN
-uv run pywrangler deploy
 ```
 
-Attach a custom domain to the R2 bucket matching `FIRMWARE_ROOT`, so the URLs
+The D1 binding carries no `database_id`, so the first deploy creates the
+database and writes its id back into `wrangler.jsonc`; the binding stays linked
+on later deploys regardless. The R2 bucket is named explicitly instead, because
+it is public-facing — dropping `bucket_name` would work the same way but leave
+you with a generated name.
+
+Attach a custom domain to the bucket matching `FIRMWARE_ROOT`, so the URLs
 recorded in the database resolve to the blobs the cron uploads.
 
 ## Firmware data
