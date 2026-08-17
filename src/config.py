@@ -7,7 +7,7 @@ in production.
 """
 
 DEFAULTS = {
-    "FIRMWARE_ROOT": "https://cohorts-storage.ave.zone/fw",
+    "FIRMWARE_ROOT": "https://cohorts-storage.lavate.ch/fw",
     "R2_PREFIX": "fw/",
 }
 

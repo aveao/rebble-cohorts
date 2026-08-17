@@ -22,7 +22,7 @@ import time
 import click
 
 VALID_FW_KINDS = ("normal", "recovery")
-DEFAULT_FIRMWARE_ROOT = "https://cohorts-storage.ave.zone/fw"
+DEFAULT_FIRMWARE_ROOT = "https://cohorts-storage.lavate.ch/fw"
 
 UPSERT = """INSERT INTO firmwares (hardware, kind, version, url, sha256, timestamp, notes)
 VALUES ({values})

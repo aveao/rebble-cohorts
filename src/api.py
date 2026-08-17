@@ -58,7 +58,7 @@ async def generate_linked_services(req: CohortRequest):
 
 async def generate_health_insights(req: CohortRequest):
     return {
-        "url": "https://cohorts-storage.ave.zone/health-insights/v11/insights.pbhi",
+        "url": "https://cohorts-storage.lavate.ch/health-insights/v11/insights.pbhi",
         "version": 11,
     }
 

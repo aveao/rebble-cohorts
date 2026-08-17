@@ -17,7 +17,7 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | --- | --- | --- | --- |
 | `DB` | D1 binding | — | Firmware metadata database |
 | `BINARIES` | R2 binding | — | Bucket holding the `.pbz` blobs |
-| `FIRMWARE_ROOT` | var | `https://cohorts-storage.ave.zone/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
+| `FIRMWARE_ROOT` | var | `https://cohorts-storage.lavate.ch/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
 | `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
 | `REBBLE_AUTH` | var | empty | Rebble auth service URL; if empty, `Authorization` headers on `/cohort` are ignored |
 | `MEMFAULT_TOKEN` | secret | — | Memfault project key, required by the cron |
@@ -108,7 +108,7 @@ uv run tools/cli.py submit_firmware <hardware> <kind> <version> <url> <sha256> \
 npx wrangler d1 execute cohorts --remote --file=fw.sql
 ```
 
-Both build URLs from `--firmware-root` (default `https://cohorts-storage.ave.zone/fw`),
+Both build URLs from `--firmware-root` (default `https://cohorts-storage.lavate.ch/fw`),
 so make sure it matches the Worker's `FIRMWARE_ROOT`. URLs are formed on insert,
 not on request.
 

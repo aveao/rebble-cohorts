@@ -11,7 +11,7 @@
   // FIRMWARE_ROOT/<hardware>/<file> in the database. REBBLE_AUTH empty means
   // Authorization headers on /cohort are ignored, as before.
   "vars": {
-    "FIRMWARE_ROOT": "https://cohorts-storage.ave.zone/fw",
+    "FIRMWARE_ROOT": "https://cohorts-storage.lavate.ch/fw",
     "REBBLE_AUTH": "",
     "R2_PREFIX": "fw/"
   },
