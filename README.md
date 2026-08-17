@@ -140,6 +140,9 @@ npx wrangler d1 migrations create cohorts "<message>"
   Workers runtime does not provide, and fails with `NotImplementedError`.
 - The `scheduled(self, controller, env, ctx)` handler receives `env` as `None`;
   the bindings are on `self.env`.
-- `requires-python` in pyproject.toml governs the local tooling venv only.
+- `requires-python` in pyproject.toml governs the local tooling venv only, and
+  is deliberately wide so uv can use whatever CPython is already installed.
   pywrangler resolves the Worker's own interpreter and dependencies into
-  `pylock.toml` (currently Python 3.13).
+  `pylock.toml`, and that one is always downloaded: it is a Pyodide
+  `emscripten-wasm32` build (~14 MB), not something a system Python can stand in
+  for, so `UV_PYTHON_DOWNLOADS=never` breaks the build.

@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "The Rebble cohorts API"
 readme = "README.md"
 # Applies to the local tooling env only; pywrangler resolves the Worker's own
-# interpreter and dependencies separately (see pylock.toml).
-requires-python = "==3.12.*"
+# interpreter and dependencies separately (see pylock.toml). Kept wide enough to
+# accept a system interpreter — pinning it to a version the machine does not
+# have makes uv download a second CPython purely to run ruff and pywrangler.
+requires-python = ">=3.12"
 # Worker runtime dependencies only — these get bundled into the deployed Worker,
 # so keep the list short. Outbound HTTP goes through the runtime's own fetch
 # (workers SDK, shipped with the runtime) rather than httpx, which falls back to
