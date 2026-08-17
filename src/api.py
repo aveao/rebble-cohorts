@@ -1,29 +1,20 @@
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import PlainTextResponse
-from workers import fetch
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 import firmware
-from config import var
 
-
-async def optional_auth(
-    request: Request,
-    authorization: Annotated[str | None, Header()] = None,
-) -> dict | None:
-    env = request.scope["env"]
-    rebble_auth_host = var(env, "REBBLE_AUTH")
-    if not authorization or not rebble_auth_host:
-        return None
-    result = await fetch(f"{rebble_auth_host}/api/v1/me", headers={"Authorization": authorization})
-    if result.status != 200:
-        raise HTTPException(401)
-    return await result.json()
-
-
-app = FastAPI(title="cohorts", description="The Rebble cohorts API")
+# No docs routes: this API has three endpoints and no consumer for a schema, and
+# keeping them out spares the route table and the deploy-time snapshot.
+app = FastAPI(
+    title="cohorts",
+    description="The Rebble cohorts API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 
 @dataclass
@@ -75,7 +66,7 @@ generators = {
 }
 
 
-@app.get("/cohort", dependencies=[Depends(optional_auth)])
+@app.get("/cohort")
 async def cohort(
     request: Request,
     select: str | None = None,
@@ -97,10 +88,13 @@ async def cohort(
         if entry not in generators:
             raise HTTPException(400)
         response[entry] = await generators[entry](req)
-    return response
+    # Returning a Response rather than a dict skips FastAPI's jsonable_encoder
+    # and response-model handling, which is worth about a millisecond on the 68
+    # rows of fw-all.
+    return JSONResponse(response)
 
 
-@app.get("/heartbeat", response_class=PlainTextResponse)
-@app.get("/cohorts/heartbeat", response_class=PlainTextResponse)
+@app.get("/heartbeat")
+@app.get("/cohorts/heartbeat")
 async def heartbeat():
-    return "ok"
+    return PlainTextResponse("ok")

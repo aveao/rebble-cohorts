@@ -2,9 +2,6 @@
 # values with `npx wrangler secret put <NAME>` (secrets) or in wrangler.jsonc
 # (vars).
 
-# Rebble auth service. Leave empty to ignore Authorization headers on /cohort.
-REBBLE_AUTH=
-
 # Memfault project key, required by the cron.
 MEMFAULT_TOKEN=
 

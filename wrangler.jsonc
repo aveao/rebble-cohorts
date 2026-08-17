@@ -8,11 +8,9 @@
   // FIRMWARE_ROOT is the public base URL for firmware blobs, and must line up
   // with whatever custom domain is attached to the R2 bucket below: the cron
   // writes objects at R2_PREFIX/<hardware>/<file> and stores
-  // FIRMWARE_ROOT/<hardware>/<file> in the database. REBBLE_AUTH empty means
-  // Authorization headers on /cohort are ignored, as before.
+  // FIRMWARE_ROOT/<hardware>/<file> in the database.
   "vars": {
     "FIRMWARE_ROOT": "https://cohorts-storage.lavate.ch/fw",
-    "REBBLE_AUTH": "",
     "R2_PREFIX": "fw/"
   },
 
