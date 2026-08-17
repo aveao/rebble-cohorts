@@ -304,7 +304,7 @@
     }
     ident.append(name);
 
-    const facts = [device.hardware, device.source ?? "canonical"];
+    const facts = [device.hardware, `track: ${device.source ?? "default"}`];
     if (build) facts.push(date(build.timestamp));
     ident.append(el("div", "meta", facts.join("  ·  ")));
     line.append(ident);
