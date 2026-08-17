@@ -59,7 +59,7 @@ async def _sha256(data):
 
     Identical digest, but native code instead of hashlib compiled to WASM: 48ms
     -> 2ms for a 1.7 MB firmware, measured. Hashing is the only part of this job
-    that costs real CPU — everything else is waiting on the network.
+    that costs real CPU, everything else is waiting on the network.
     """
     from js import Uint8Array, crypto
     from pyodide.ffi import to_js

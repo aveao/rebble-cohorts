@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firmware · cohorts</title>
+<meta name="description" content="The firmware builds this cohorts instance currently serves to Pebble watches.">
+<style>
+  :root {
+    --paper:  #e9e9e4;
+    --card:   #fbfbf9;
+    --ink:    #101014;
+    --muted:  #6f6f68;
+    --rule:   #c9c9c2;
+    --accent: #ff4a00;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    --step: 4px;
+    --radius: 3px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:  #131317;
+      --card:   #1b1b21;
+      --ink:    #e8e8e2;
+      --muted:  #8b8b84;
+      --rule:   #2e2e37;
+      --accent: #ff5c19;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: calc(var(--step) * 12) calc(var(--step) * 6) calc(var(--step) * 20);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  .eyebrow {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: calc(var(--step) * 2) 0 0;
+    font-size: clamp(30px, 6vw, 44px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 620;
+  }
+
+  .lede { margin: calc(var(--step) * 3) 0 0; max-width: 48ch; color: var(--muted); }
+
+  .readout {
+    margin: calc(var(--step) * 6) 0 0;
+    padding-top: calc(var(--step) * 3);
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  /* ---- groups ------------------------------------------------------ */
+
+  .group { margin-top: calc(var(--step) * 10); }
+  .group h2 {
+    margin: 0 0 calc(var(--step) * 3);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .list { list-style: none; margin: 0; padding: 0; }
+
+  /* ---- rows -------------------------------------------------------- */
+
+  .row {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    margin-top: calc(var(--step) * 2);
+  }
+
+  .line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: calc(var(--step) * 5);
+    padding: calc(var(--step) * 4) calc(var(--step) * 5);
+  }
+
+  .ident { min-width: 0; }
+
+  .name { font-size: 16px; font-weight: 580; letter-spacing: -0.01em; }
+
+  .meta {
+    margin-top: 2px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    word-break: break-all;
+  }
+
+  .stage {
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: calc(var(--step) * 2);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    white-space: nowrap;
+    cursor: help;
+  }
+
+  .version {
+    font-family: var(--mono);
+    font-size: clamp(17px, 2.6vw, 21px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    text-align: right;
+    word-break: break-all;
+  }
+
+  .version.missing { font-size: 13px; color: var(--muted); letter-spacing: 0.06em; }
+
+  .download {
+    display: inline-block;
+    padding: calc(var(--step) * 2.5) calc(var(--step) * 4);
+    background: var(--ink);
+    color: var(--card);
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 560;
+    white-space: nowrap;
+    transition: background 120ms ease;
+  }
+
+  .download:hover { background: var(--accent); }
+  .download:focus-visible,
+  .notes-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- release notes ----------------------------------------------- */
+
+  .notes { border-top: 1px solid var(--rule); }
+
+  .notes-toggle {
+    cursor: pointer;
+    list-style: none;
+    padding: calc(var(--step) * 3) calc(var(--step) * 5);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .notes-toggle::-webkit-details-marker { display: none; }
+  .notes-toggle::before { content: "+ "; color: var(--accent); }
+  .notes[open] .notes-toggle::before { content: "- "; }
+  .notes-toggle:hover { color: var(--ink); }
+
+  .notes-body {
+    padding: 0 calc(var(--step) * 5) calc(var(--step) * 5);
+    white-space: pre-wrap;
+  }
+
+  .hash {
+    margin-top: calc(var(--step) * 4);
+    padding-top: calc(var(--step) * 3);
+    border-top: 1px dashed var(--rule);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    word-break: break-all;
+  }
+
+  .state {
+    margin-top: calc(var(--step) * 4);
+    padding: calc(var(--step) * 6);
+    border: 1px dashed var(--rule);
+    border-radius: var(--radius);
+    color: var(--muted);
+  }
+
+  footer {
+    margin-top: calc(var(--step) * 12);
+    padding-top: calc(var(--step) * 4);
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  footer code { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+
+  @media (max-width: 620px) {
+    .line { grid-template-columns: minmax(0, 1fr); gap: calc(var(--step) * 3); }
+    .version { text-align: left; }
+    .download { justify-self: start; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .row { animation: rise 300ms cubic-bezier(.2, .7, .3, 1) both; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">cohorts</p>
+    <h1>Pebble firmware</h1>
+    <p class="lede">The build this instance serves to each watch right now. Same requests your
+      watch makes, so what you see here is what it gets.</p>
+    <p class="readout" id="readout" aria-live="polite">Loading…</p>
+  </header>
+
+  <main id="groups"></main>
+
+  <footer>
+    Watches ask <code>/cohort?select=fw&amp;hardware=&lt;name&gt;</code>. Add
+    <code>&amp;source=&lt;track&gt;</code> for a build track other than canonical.
+  </footer>
+</div>
+
+<script>
+  // Hardware this page lists, in the order it shows them. `source` is omitted
+  // deliberately when a device tracks the canonical build: the request then
+  // matches the one watches make, and rides the same cached response.
+  const STAGES = {
+    evt: "EVT, engineering validation test hardware",
+    dvt: "DVT, design validation test hardware",
+    pvt: "PVT, production validation test hardware",
+  };
+
+  const GROUPS = [
+    {
+      title: "Core Devices",
+      devices: [
+        { hardware: "asterix", name: "Pebble 2 Duo" },
+        { hardware: "obelix_pvt", name: "Core Time 2" },
+        { hardware: "getafix_dvt", name: "Core Round 2", stage: "dvt" },
+      ],
+    },
+    {
+      title: "Classic Pebble",
+      devices: [
+        { hardware: "v1_5", name: "Pebble" },
+        { hardware: "v2_0", name: "Pebble Steel" },
+        { hardware: "snowy_dvt", name: "Pebble Time" },
+        { hardware: "snowy_s3", name: "Pebble Time Steel" },
+        { hardware: "spalding", name: "Pebble Time Round" },
+        { hardware: "silk", name: "Pebble 2" },
+      ],
+    },
+    {
+      title: "Prototypes & boards",
+      devices: [
+        { hardware: "ev2_4", name: "Pebble", stage: "evt" },
+        { hardware: "snowy_evt2", name: "Pebble Time", stage: "evt" },
+        { hardware: "spalding_evt", name: "Pebble Time Round", stage: "evt" },
+        { hardware: "silk_evt", name: "Pebble 2", stage: "evt" },
+        { hardware: "robert_evt", name: "Pebble Time 2", stage: "evt" },
+        { hardware: "obelix_dvt", name: "Core Time 2", stage: "dvt" },
+        { hardware: "obelix_evt", name: "Core Time 2", stage: "evt" },
+        { hardware: "getafix_evt", name: "Core Round 2", stage: "evt" },
+        { hardware: "bb2", name: "Bigboard 2" },
+      ],
+    },
+  ];
+
+  const groups = document.getElementById("groups");
+  const readout = document.getElementById("readout");
+
+  const date = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  async function fetchDevice(device) {
+    const params = new URLSearchParams({ select: "fw", hardware: device.hardware });
+    if (device.source) params.set("source", device.source);
+    try {
+      const response = await fetch(`/cohort?${params}`);
+      if (!response.ok) return { device, build: null };
+      const body = await response.json();
+      return { device, build: body.fw?.normal ?? null };
+    } catch {
+      return { device, build: null, offline: true };
+    }
+  }
+
+  function renderRow({ device, build }, index) {
+    const row = el("li", "row");
+    row.style.animationDelay = `${Math.min(index * 30, 300)}ms`;
+
+    const line = el("div", "line");
+    const ident = el("div", "ident");
+    const name = el("div", "name", device.name);
+    if (device.stage) {
+      const stage = el("span", "stage", device.stage.toUpperCase());
+      stage.title = STAGES[device.stage];
+      name.append(stage);
+    }
+    ident.append(name);
+
+    const facts = [device.hardware, device.source ?? "canonical"];
+    if (build) facts.push(date(build.timestamp));
+    ident.append(el("div", "meta", facts.join("  ·  ")));
+    line.append(ident);
+
+    if (!build) {
+      line.append(el("div", "version missing", "No build"));
+      line.append(el("span"));
+      row.append(line);
+      return row;
+    }
+
+    line.append(el("div", "version", build.friendlyVersion));
+    const download = el("a", "download", "Download .pbz");
+    download.href = build.url;
+    download.rel = "noopener";
+    line.append(download);
+    row.append(line);
+
+    // The API substitutes the version when a build carries no notes of its own.
+    if (build.notes && build.notes !== build.friendlyVersion) {
+      const notes = el("details", "notes");
+      const body = el("div", "notes-body", build.notes);
+      body.append(el("div", "hash", `sha-256 ${build["sha-256"]}`));
+      notes.append(el("summary", "notes-toggle", "Release notes"), body);
+      row.append(notes);
+    }
+    return row;
+  }
+
+  async function load() {
+    const results = await Promise.all(
+      GROUPS.flatMap((group) => group.devices).map(fetchDevice)
+    );
+    const byHardware = new Map(results.map((r) => [r.device.hardware, r]));
+
+    if (results.every((r) => r.offline)) {
+      readout.textContent = "offline";
+      groups.append(el("p", "state", "Could not reach the API. Check your connection and reload."));
+      return;
+    }
+
+    let index = 0;
+    for (const group of GROUPS) {
+      const section = el("section", "group");
+      section.append(el("h2", null, group.title));
+      const list = el("ol", "list");
+      for (const device of group.devices) {
+        list.append(renderRow(byHardware.get(device.hardware), index++));
+      }
+      section.append(list);
+      groups.append(section);
+    }
+
+    const served = results.filter((r) => r.build).length;
+    readout.textContent = `${served} of ${results.length} hardware · canonical`;
+  }
+
+  load();
+</script>
+</body>
+</html>

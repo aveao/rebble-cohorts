@@ -5,6 +5,11 @@
   "compatibility_flags": ["python_workers"],
   "observability": { "enabled": true },
 
+  // The landing page is served straight from assets, ahead of the Worker, so
+  // viewing it costs no invocation. Paths with no matching file, /cohort and
+  // the rest, fall through to the Worker.
+  "assets": { "directory": "./public" },
+
   // FIRMWARE_ROOT is the public base URL for firmware blobs, and must line up
   // with whatever custom domain is attached to the R2 bucket below: the cron
   // writes objects at R2_PREFIX/<hardware>/<file> and stores
@@ -26,7 +31,7 @@
     }
   ],
 
-  // bucket_name is explicit because it is public-facing — a custom domain points
+  // bucket_name is explicit because it is public-facing, a custom domain points
   // at it and firmware URLs are stored in the database. Omitting it would let
   // wrangler provision a bucket under a generated, worker-prefixed name instead.
   "r2_buckets": [
