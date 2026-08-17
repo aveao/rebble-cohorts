@@ -7,7 +7,7 @@ in production.
 """
 
 DEFAULTS = {
-    "FIRMWARE_ROOT": "https://binaries.rebble.io/fw",
+    "FIRMWARE_ROOT": "https://cohorts-storage.ave.zone/fw",
     "R2_PREFIX": "fw/",
 }
 

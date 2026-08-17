@@ -17,7 +17,7 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | --- | --- | --- | --- |
 | `DB` | D1 binding | — | Firmware metadata database |
 | `BINARIES` | R2 binding | — | Bucket holding the `.pbz` blobs |
-| `FIRMWARE_ROOT` | var | `https://binaries.rebble.io/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
+| `FIRMWARE_ROOT` | var | `https://cohorts-storage.ave.zone/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
 | `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
 | `REBBLE_AUTH` | var | empty | Rebble auth service URL; if empty, `Authorization` headers on `/cohort` are ignored |
 | `MEMFAULT_TOKEN` | secret | — | Memfault project key, required by the cron |
@@ -60,6 +60,26 @@ you with a generated name.
 Attach a custom domain to the bucket matching `FIRMWARE_ROOT`, so the URLs
 recorded in the database resolve to the blobs the cron uploads.
 
+### Deploying from the Cloudflare dashboard
+
+Workers Builds ships Node and Python but no uv, which pywrangler requires, so
+both commands have to be set — the default deploy command does not work here.
+Plain `npx wrangler deploy` succeeds but uploads only the five source files
+without the vendored dependencies, producing a Worker that fails at runtime.
+
+| Setting | Value |
+| --- | --- |
+| Build command | `pip install uv && uv sync` |
+| Deploy command | `uv run pywrangler deploy` |
+| Non-production branch deploy command | `uv run pywrangler versions upload` |
+
+Migrations are not part of a deploy. Either apply them from your machine, or
+chain them ahead of the deploy: `uv run pywrangler d1 migrations apply cohorts
+--remote && uv run pywrangler deploy` — the tracking table makes it a no-op when
+there is nothing new. Secrets are not build variables: set `MEMFAULT_TOKEN` with
+`wrangler secret put` or in the dashboard. On dashboard deploys, a provisioned
+D1 id is visible in the dashboard rather than written back to the repository.
+
 ## Firmware data
 
 Firmware rows live in the `firmwares` table, keyed by `(hardware, kind, version)`. Multiple versions per `(hardware, kind)` are allowed so rollback works by submitting an older version with a newer timestamp — `/cohort?select=fw` always returns the latest row per requested kind by `timestamp` descending.
@@ -88,7 +108,7 @@ uv run tools/cli.py submit_firmware <hardware> <kind> <version> <url> <sha256> \
 npx wrangler d1 execute cohorts --remote --file=fw.sql
 ```
 
-Both build URLs from `--firmware-root` (default `https://binaries.rebble.io/fw`),
+Both build URLs from `--firmware-root` (default `https://cohorts-storage.ave.zone/fw`),
 so make sure it matches the Worker's `FIRMWARE_ROOT`. URLs are formed on insert,
 not on request.
 
