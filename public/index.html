@@ -7,6 +7,8 @@
 <meta name="description" content="The firmware builds this cohorts instance currently serves to Pebble watches.">
 <style>
   :root {
+    color-scheme: light dark;
+
     --paper:  #e9e9e4;
     --card:   #fbfbf9;
     --ink:    #101014;
@@ -35,6 +37,10 @@
   }
 
   * { box-sizing: border-box; }
+
+  /* On the root as well as the body: overscroll paints from here, and it is
+     the element a theme detector samples. */
+  html { background: var(--paper); }
 
   body {
     margin: 0;
