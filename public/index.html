@@ -63,6 +63,16 @@
     font-weight: 620;
   }
 
+  /* The dictionary gloss under the title. No measure: it is one sentence,
+     and the page wrap already holds it to a single line on a wide screen. */
+  .gloss {
+    margin: calc(var(--step) * 2) 0 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .gloss i { color: var(--ink); }
+
   .readout {
     margin: calc(var(--step) * 5) 0 0;
     padding-top: calc(var(--step) * 3);
@@ -183,9 +193,6 @@
     list-style: none;
   }
 
-  /* Keeps the row the same height as one with notes still collapsed. */
-  .notes-none::before { content: "  "; white-space: pre; }
-
   .notes-toggle::-webkit-details-marker { display: none; }
   .notes-toggle::before { content: "+ "; color: var(--accent); }
   .notes[open] .notes-toggle::before { content: "- "; }
@@ -256,6 +263,7 @@
 <div class="wrap">
   <header>
     <h1>cohorts</h1>
+    <p class="gloss"><i>(noun, statistics)</i> a group of individuals having a statistical factor in common in a demographic study</p>
     <p class="readout" id="readout" aria-live="polite">Loading…</p>
   </header>
 
