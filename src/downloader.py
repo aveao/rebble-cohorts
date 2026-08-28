@@ -31,6 +31,7 @@ CORE_DEVICES_DEVICES = (
     "obelix_pvt",
     "getafix_evt",
     "getafix_dvt",
+    "getafix_dvt2",
 )
 
 

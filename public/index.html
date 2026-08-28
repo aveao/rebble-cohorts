@@ -277,6 +277,7 @@
   const STAGES = {
     evt: "EVT, engineering validation test hardware",
     dvt: "DVT, design validation test hardware",
+    dvt2: "DVT2, second design validation test revision",
     pvt: "PVT, production validation test hardware",
   };
 
@@ -286,7 +287,7 @@
       devices: [
         { hardware: "asterix", name: "Pebble 2 Duo" },
         { hardware: "obelix_pvt", name: "Pebble Time 2" },
-        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt" },
+        { hardware: "getafix_dvt2", name: "Pebble Round 2", stage: "dvt2" },
       ],
     },
     {
@@ -294,7 +295,7 @@
       devices: [
         { hardware: "asterix", name: "Pebble 2 Duo", source: "beta" },
         { hardware: "obelix_pvt", name: "Pebble Time 2", source: "beta" },
-        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt", source: "beta" },
+        { hardware: "getafix_dvt2", name: "Pebble Round 2", stage: "dvt2", source: "beta" },
       ],
     },
     {
@@ -302,7 +303,7 @@
       devices: [
         { hardware: "asterix", name: "Pebble 2 Duo", source: "notion" },
         { hardware: "obelix_pvt", name: "Pebble Time 2", source: "notion" },
-        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt", source: "notion" },
+        { hardware: "getafix_dvt2", name: "Pebble Round 2", stage: "dvt2", source: "notion" },
       ],
     },
     {
@@ -327,6 +328,7 @@
         { hardware: "robert_evt", name: "Pebble Time 2", stage: "evt" },
         { hardware: "obelix_dvt", name: "Core Time 2", stage: "dvt" },
         { hardware: "obelix_evt", name: "Core Time 2", stage: "evt" },
+        { hardware: "getafix_dvt", name: "Core Round 2", stage: "dvt" },
         { hardware: "getafix_evt", name: "Core Round 2", stage: "evt" },
         { hardware: "bb2", name: "Bigboard 2" },
       ],
