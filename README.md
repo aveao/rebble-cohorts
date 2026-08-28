@@ -291,10 +291,10 @@ The two channels are independent: `scheduled` runs each in turn and catches
 whatever the other raises, so an expired dash token cannot cost the notion run
 and a changelog that will not parse cannot cost the canonical one.
 
-One hourly cron, at :30, polls every device on every channel in a single
-invocation. Hashing is the only part that costs meaningful CPU, and it only
-happens for a version that is actually new, so a run where nothing has been
-published does almost no work.
+One hourly cron polls every device on every channel in a single invocation.
+Hashing is the only part that costs meaningful CPU, and it only happens for a
+version that is actually new, so a run where nothing has been published does
+almost no work.
 
 Keep the interval at an hour or longer: Cloudflare caps cron invocations at 30s
 CPU below an hourly interval, versus 15 minutes at an hour or above.
