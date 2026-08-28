@@ -23,7 +23,7 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | `BINARIES` | R2 binding | none | Bucket holding the `.pbz` blobs |
 | `FIRMWARE_ROOT` | var | `https://cohorts-storage.lavate.ch/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
 | `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
-| `DEVICE_SERIAL` | var | `REBBLE_COHORTS_CRON` | Serial the cron reports upstream; the Core Devices dash answers per device, so it picks which build we are offered |
+| `DEVICE_SERIAL` | var | `AVE_COHORTS_CRON` | Serial the cron reports upstream; the Core Devices dash answers per device, so it picks which build we are offered |
 | `CORE_DASH_REFRESH_TOKEN` | secret | none | Refresh token for an anonymous Firebase account, required by the cron |
 | `CORE_DASH_REFRESH_TOKEN_BETA` | secret | none | A second such account, enrolled in the beta programme; unset means that channel skips |
 | `CORE_DASH_FIREBASE_KEY` | var | CoreApp's key | Firebase Web API key for project `coreapp-ce061`, a public client identifier rather than a secret |

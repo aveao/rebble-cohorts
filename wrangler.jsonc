@@ -24,7 +24,7 @@
   "vars": {
     "FIRMWARE_ROOT": "https://cohorts-storage.lavate.ch/fw",
     "R2_PREFIX": "fw/",
-    "DEVICE_SERIAL": "REBBLE_COHORTS_CRON",
+    "DEVICE_SERIAL": "AVE_COHORTS_CRON",
     "CORE_DASH_FIREBASE_KEY": "AIzaSyD-xpPFNkplPF-_DOS1jFCMILg_7yPwHqA"
   },
 

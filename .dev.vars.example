@@ -16,7 +16,7 @@ MEMFAULT_TOKEN=
 
 # Optional: the serial the cron reports upstream. The Core Devices dash answers
 # per device, so this picks which build we are offered.
-# DEVICE_SERIAL=REBBLE_COHORTS_CRON
+# DEVICE_SERIAL=AVE_COHORTS_CRON
 
 # Optional: point a poller at a stand-in upstream while developing.
 # CORE_DASH_API=http://127.0.0.1:5005/api/ota/latest

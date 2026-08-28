@@ -9,7 +9,7 @@ in production.
 DEFAULTS = {
     "FIRMWARE_ROOT": "https://cohorts-storage.lavate.ch/fw",
     "R2_PREFIX": "fw/",
-    "DEVICE_SERIAL": "REBBLE_COHORTS_CRON",
+    "DEVICE_SERIAL": "AVE_COHORTS_CRON",
     # A Firebase Web API key is a public client identifier, not a secret, so it
     # lives with the vars. This one is CoreApp's, for project coreapp-ce061.
     "CORE_DASH_FIREBASE_KEY": "AIzaSyD-xpPFNkplPF-_DOS1jFCMILg_7yPwHqA",
