@@ -25,6 +25,7 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
 | `DEVICE_SERIAL` | var | `REBBLE_COHORTS_CRON` | Serial the cron reports upstream; the Core Devices dash answers per device, so it picks which build we are offered |
 | `CORE_DASH_REFRESH_TOKEN` | secret | none | Refresh token for an anonymous Firebase account, required by the cron |
+| `CORE_DASH_REFRESH_TOKEN_BETA` | secret | none | A second such account, enrolled in the beta programme; unset means that channel skips |
 | `CORE_DASH_FIREBASE_KEY` | var | CoreApp's key | Firebase Web API key for project `coreapp-ce061`, a public client identifier rather than a secret |
 | `CORE_DASH_API` | var | eng-dash's `/ota/latest` | Override only to point the cron at a stand-in while developing |
 | `MEMFAULT_TOKEN` | secret | none | Memfault project key, needed only by the fallback poller |
@@ -234,6 +235,24 @@ There are two, and they differ only in who they ask:
 runs for the canonical track. Memfault is the app's own fallback and stays
 wired up in the same sense: swapping it into `CHANNELS` in `src/entry.py` is
 the whole change.
+
+#### The beta track
+
+`core_dash.py` runs twice per cron, over two accounts. eng-dash chooses the
+release by the asking account's own track, so a second anonymous account
+enrolled in the beta programme is offered beta builds from the identical
+request, and its rows land on `beta`. Mint it exactly as the first one and set
+it as `CORE_DASH_REFRESH_TOKEN_BETA`.
+
+The channel is optional: with no token set it logs a line and skips, so
+deploying ahead of minting the account costs nothing. If the account turns out
+not to be on a beta track it is simply offered the canonical builds, and the
+two tracks agree until it is enrolled.
+
+Its blobs take a `beta-` filename prefix. The two accounts can be offered
+different builds under one version string, and without a prefix the second
+upload would land on the first one's R2 key, leaving a row pointing at bytes
+its `sha256` no longer describes.
 
 #### The notion channel
 

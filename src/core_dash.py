@@ -10,9 +10,14 @@ The endpoint wants a Firebase ID token for the coreapp project, and an
 anonymous one is accepted: the app signs in anonymously whenever nobody is
 logged in, so effectively every install carries a valid token. ID tokens last
 an hour, which is exactly the cron interval, so there is nothing worth caching
-between runs. We keep the refresh token of one anonymous account in the env and
+between runs. We keep the refresh token of an anonymous account in the env and
 exchange it for a fresh ID token at the top of every run: one extra request an
 hour, and no KV entry to keep in step with the token's lifetime.
+
+The module runs twice per cron, over two accounts. eng-dash chooses the release
+by the asking account's track, so a second account enrolled in the beta
+programme sees beta builds from the identical request, and its rows land on the
+`beta` track. Everything else about the two runs is the same code.
 
 Two differences from Memfault worth knowing about:
 
@@ -35,6 +40,19 @@ from downloader import CORE_DEVICES_DEVICES, FetchError, Run
 
 CORE_DASH_API = "https://dash.repebble.com/api/ota/latest"
 FIREBASE_TOKEN_API = "https://securetoken.googleapis.com/v1/token"
+
+# Two anonymous accounts, one per track. eng-dash chooses what to offer by the
+# account's own track, so a second account enrolled in the beta programme is
+# the whole mechanism: same endpoint, same query, different answer.
+CANONICAL_TOKEN = "CORE_DASH_REFRESH_TOKEN"
+BETA_TOKEN = "CORE_DASH_REFRESH_TOKEN_BETA"
+BETA_SOURCE = "beta"
+
+# The beta blobs need a name of their own. The two accounts can be offered
+# different builds under one version string, and without a prefix the second
+# upload would land on the first one's R2 key and leave a row pointing at bytes
+# its sha256 no longer describes.
+BETA_PREFIX = "beta-"
 
 
 async def _id_token(api_key, refresh_token):
@@ -79,12 +97,17 @@ def _artifact_url(info, hardware):
     return artifacts[0]["url"] if artifacts else None
 
 
-async def fetch_firmware(env):
-    refresh_token = var(env, "CORE_DASH_REFRESH_TOKEN")
+async def _poll(env, token_var, source=None, filename_prefix="", required=True):
+    refresh_token = var(env, token_var)
     if not refresh_token:
+        if not required:
+            # An optional track nobody has minted an account for yet. Saying so
+            # once an hour is more useful than failing once an hour.
+            print(f"{token_var} not set, skipping this track")
+            return None
         raise RuntimeError(
-            "CORE_DASH_REFRESH_TOKEN not set "
-            "(npx wrangler secret put CORE_DASH_REFRESH_TOKEN; see the README for minting one)."
+            f"{token_var} not set "
+            f"(npx wrangler secret put {token_var}; see the README for minting one)."
         )
     api_key = var(env, "CORE_DASH_FIREBASE_KEY")
     api = var(env, "CORE_DASH_API", CORE_DASH_API)
@@ -96,7 +119,7 @@ async def fetch_firmware(env):
         # so stop here rather than logging the same failure six times.
         raise RuntimeError(f"could not refresh the anonymous Firebase token ({e.status})") from None
 
-    run = Run(env)
+    run = Run(env, source=source, filename_prefix=filename_prefix)
     for hardware in CORE_DEVICES_DEVICES:
         try:
             info = await _fetch_latest(api, token, hardware, run.serial)
@@ -116,3 +139,23 @@ async def fetch_firmware(env):
         await run.publish(hardware, info["version"], info.get("notes") or None, artifact_url)
 
     return run.summary()
+
+
+async def fetch_firmware(env):
+    """The canonical track, from the account every install effectively has."""
+    return await _poll(env, CANONICAL_TOKEN)
+
+
+async def fetch_beta_firmware(env):
+    """The beta track, from a second account enrolled in it.
+
+    Same endpoint and the same request; what differs is who is asking. eng-dash
+    picks the release by the account's track, so which builds this sees is a
+    property of the account behind CORE_DASH_REFRESH_TOKEN_BETA and not of
+    anything we send. If that account is not on a beta track it is simply
+    offered the canonical builds, and the two tracks agree.
+
+    Optional: with no token set the channel skips rather than failing, so
+    deploying this before minting the account costs nothing.
+    """
+    return await _poll(env, BETA_TOKEN, BETA_SOURCE, BETA_PREFIX, required=False)

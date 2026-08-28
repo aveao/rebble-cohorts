@@ -28,9 +28,10 @@
     "CORE_DASH_FIREBASE_KEY": "AIzaSyD-xpPFNkplPF-_DOS1jFCMILg_7yPwHqA"
   },
 
-  // The two credentials are secrets, not vars:
-  //   npx wrangler secret put CORE_DASH_REFRESH_TOKEN   (the cron's poller)
-  //   npx wrangler secret put MEMFAULT_TOKEN            (the fallback poller)
+  // The credentials are secrets, not vars:
+  //   npx wrangler secret put CORE_DASH_REFRESH_TOKEN       (canonical track)
+  //   npx wrangler secret put CORE_DASH_REFRESH_TOKEN_BETA  (beta track, optional)
+  //   npx wrangler secret put MEMFAULT_TOKEN                (fallback poller)
 
   // No database_id: wrangler provisions the database on first deploy and writes
   // the id back here. The binding stays linked on later deploys either way.

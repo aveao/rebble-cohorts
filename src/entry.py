@@ -7,10 +7,14 @@ import notion
 from api import app
 
 # The channels the cron polls, in order. core-dash publishes the canonical
-# firmware, the rows a /cohort request without ?source= gets; notion publishes
-# to its own track. They share the R2 bucket and the firmwares table, nothing
-# else.
-CHANNELS = (("core-dash", core_dash.fetch_firmware), ("notion", notion.fetch_firmware))
+# firmware, the rows a /cohort request without ?source= gets; the other two
+# publish to their own tracks. They share the R2 bucket and the firmwares
+# table, nothing else.
+CHANNELS = (
+    ("core-dash", core_dash.fetch_firmware),
+    ("core-dash-beta", core_dash.fetch_beta_firmware),
+    ("notion", notion.fetch_firmware),
+)
 
 
 class Default(WorkerEntrypoint):

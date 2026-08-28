@@ -6,6 +6,11 @@
 # required by the cron. Mint one with the accounts:signUp call in the README.
 CORE_DASH_REFRESH_TOKEN=
 
+# Optional: a second account, enrolled in the beta programme. eng-dash answers
+# by the asking account's track, so this one's builds land on `beta`. Leave it
+# empty and that channel skips.
+CORE_DASH_REFRESH_TOKEN_BETA=
+
 # Memfault project key. Only needed if you point the cron back at memfault.py.
 MEMFAULT_TOKEN=
 
