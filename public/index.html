@@ -290,11 +290,11 @@
       ],
     },
     {
-      title: "Core Devices (Beta)",
+      title: "Core Devices (Notion)",
       devices: [
-        { hardware: "asterix", name: "Pebble 2 Duo", source: "beta" },
-        { hardware: "obelix_pvt", name: "Pebble Time 2", source: "beta" },
-        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt", source: "beta" },
+        { hardware: "asterix", name: "Pebble 2 Duo", source: "notion" },
+        { hardware: "obelix_pvt", name: "Pebble Time 2", source: "notion" },
+        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt", source: "notion" },
       ],
     },
     {
@@ -434,7 +434,7 @@
       eager.flatMap((group) => group.devices).map(fetchDevice)
     );
     // Keyed by track as well as hardware: the same watch appears in more than
-    // one group when it is listed on both the canonical and a beta track.
+    // one group when it is listed on both the canonical and another track.
     const byDevice = new Map(results.map((r) => [deviceKey(r.device), r]));
 
     if (results.every((r) => r.offline)) {

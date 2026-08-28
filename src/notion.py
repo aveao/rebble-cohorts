@@ -1,4 +1,4 @@
-"""The beta channel: PebbleOS releases straight from the GitHub repo.
+"""The notion channel: PebbleOS releases straight from the GitHub repo.
 
 Core Devices announce a build on their changelog well before it reaches the OTA
 track our anonymous account resolves to, and the .pbz files are attached to the
@@ -6,10 +6,12 @@ matching GitHub release the whole time. This poller closes that gap: it reads
 the top row of the changelog table, takes the version out of it, and tries the
 release asset for each of our hardware revisions.
 
-Rows land with source='beta', so `/cohort?select=fw&hardware=...&source=beta`
-serves them and the canonical track is untouched. Blobs get a `github-` prefix
-on their R2 key, because the same version can exist on both tracks and the two
-downloads are not necessarily the same bytes.
+The track is named after where the version comes from rather than after how
+stable it is: these are the published releases, they just reach GitHub before
+they reach the OTA track. Rows land with source='notion', so
+`/cohort?select=fw&hardware=...&source=notion` serves them and the canonical
+track is untouched. Blobs get a `github-` prefix on their R2 key, naming where
+the bytes came from, since the same version can exist on both tracks.
 
 Two things worth knowing:
 
@@ -29,15 +31,15 @@ from workers import fetch
 from config import var
 from downloader import CORE_DEVICES_DEVICES, FetchError, Run
 
-SOURCE = "beta"
+SOURCE = "notion"
 
 # The published changelog, and the page id out of its HTML shell.
 NOTION_API = "https://ndocs.repebble.com/api/v3/loadPageChunk"
 NOTION_PAGE = "25efbb55-ea84-801d-a04b-fcf73c9346e1"
 
-RELEASE_ROOT = "https://github.com/coredevices/PebbleOS/releases/download"
+NOTION_RELEASE_ROOT = "https://github.com/coredevices/PebbleOS/releases/download"
 
-# Keeps a beta blob off the canonical one's R2 key when both tracks publish the
+# Keeps this track's blob off the canonical one's R2 key when both tracks publish the
 # same version for the same hardware.
 FILENAME_PREFIX = "github-"
 
@@ -143,9 +145,9 @@ async def _load_page(api, page_id):
 
 
 async def fetch_firmware(env):
-    api = var(env, "BETA_NOTION_API", NOTION_API)
-    page = var(env, "BETA_NOTION_PAGE", NOTION_PAGE)
-    root = var(env, "BETA_RELEASE_ROOT", RELEASE_ROOT)
+    api = var(env, "NOTION_API", NOTION_API)
+    page = var(env, "NOTION_PAGE", NOTION_PAGE)
+    root = var(env, "NOTION_RELEASE_ROOT", NOTION_RELEASE_ROOT)
 
     try:
         blocks = await _load_page(api, page)
@@ -160,7 +162,7 @@ async def fetch_firmware(env):
         raise RuntimeError("no release row found in the changelog table")
 
     version, notes = entry
-    print(f"changelog: newest beta is {version}")
+    print(f"changelog: newest release is {version}")
 
     run = Run(env, source=SOURCE, filename_prefix=FILENAME_PREFIX, url_guessed=True)
     for hardware in CORE_DEVICES_DEVICES:

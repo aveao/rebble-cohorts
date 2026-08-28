@@ -2,14 +2,15 @@ import asgi
 from js import caches
 from workers import WorkerEntrypoint
 
-import beta
 import core_dash
+import notion
 from api import app
 
 # The channels the cron polls, in order. core-dash publishes the canonical
-# firmware, the rows a /cohort request without ?source= gets; beta publishes to
-# its own track. They share the R2 bucket and the firmwares table, nothing else.
-CHANNELS = (("core-dash", core_dash.fetch_firmware), ("beta", beta.fetch_firmware))
+# firmware, the rows a /cohort request without ?source= gets; notion publishes
+# to its own track. They share the R2 bucket and the firmwares table, nothing
+# else.
+CHANNELS = (("core-dash", core_dash.fetch_firmware), ("notion", notion.fetch_firmware))
 
 
 class Default(WorkerEntrypoint):

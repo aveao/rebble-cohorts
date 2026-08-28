@@ -136,7 +136,7 @@ class Run:
             return
 
         # The same bytes reach us more than once: a version published on both
-        # the beta and the canonical track is one file, downloaded twice. If any
+        # the notion and the canonical track is one file, downloaded twice. If any
         # row already points at a blob with this digest and length, point the new
         # row at that object instead of storing a second copy of it. Nothing ever
         # deletes a blob, so a shared one cannot be pulled out from under a row.

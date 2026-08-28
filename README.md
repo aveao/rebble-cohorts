@@ -29,9 +29,9 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | `CORE_DASH_API` | var | eng-dash's `/ota/latest` | Override only to point the cron at a stand-in while developing |
 | `MEMFAULT_TOKEN` | secret | none | Memfault project key, needed only by the fallback poller |
 | `MEMFAULT_API` | var | Memfault's public API | Override only to point that poller at a stand-in while developing |
-| `BETA_NOTION_API` | var | the changelog's `loadPageChunk` | Override only to point the beta channel at a stand-in while developing |
-| `BETA_NOTION_PAGE` | var | the changelog page id | Override to read a different Notion page |
-| `BETA_RELEASE_ROOT` | var | PebbleOS release downloads | Override to fetch beta blobs from somewhere else |
+| `NOTION_API` | var | the changelog's `loadPageChunk` | Override only to point the notion channel at a stand-in while developing |
+| `NOTION_PAGE` | var | the changelog page id | Override to read a different Notion page |
+| `NOTION_RELEASE_ROOT` | var | PebbleOS release downloads | Override to fetch that channel's blobs from somewhere else |
 
 ## Local development
 
@@ -155,7 +155,7 @@ parallel track a client opts into:
 
 ```
 /cohort?select=fw&hardware=snowy_dvt                  # canonical
-/cohort?select=fw&hardware=snowy_dvt&source=beta      # the beta track
+/cohort?select=fw&hardware=snowy_dvt&source=notion    # the notion track
 /cohort?select=fw-all&source=coredevices-github       # everything on that track
 ```
 
@@ -171,7 +171,7 @@ Two sources may publish the same version for the same hardware, identity is
 `COALESCE(source, '')` because SQLite treats NULLs as distinct.
 
 The cron writes two tracks: core-dash publishes the canonical rows, and the
-beta channel publishes `beta`. Any other track is populated by hand with
+notion channel publishes `notion`. Any other track is populated by hand with
 `tools/cli.py submit_firmware --source`.
 
 ### Admin commands
@@ -212,7 +212,7 @@ poller does is work out what the newest version for a hardware is.
 The upload is skipped when we already hold the bytes. Before storing anything,
 every channel looks for a row whose `sha256` and `size` both match what it just
 downloaded, and points the new row at that object instead. A version that shows
-up on the beta track and later on the canonical one is one file downloaded
+up on the notion track and later on the canonical one is one file downloaded
 twice, and this keeps it as one object in R2. The download still happens: the
 digest is not known until it does.
 
@@ -235,11 +235,13 @@ runs for the canonical track. Memfault is the app's own fallback and stays
 wired up in the same sense: swapping it into `CHANNELS` in `src/entry.py` is
 the whole change.
 
-#### The beta channel
+#### The notion channel
 
-`src/beta.py` publishes the `beta` track from the PebbleOS GitHub releases,
-which carry a build for days before it reaches the OTA track our account
-resolves to. It reads the top row of the table on the [PebbleOS
+`src/notion.py` publishes the `notion` track from the PebbleOS GitHub
+releases, which carry a build for days before it reaches the OTA track our
+account resolves to. The track is named for where the version comes from
+rather than for how stable it is: these are the published releases, they just
+arrive on GitHub first. It reads the top row of the table on the [PebbleOS
 changelog](https://ndocs.repebble.com/pebbleos-changelog), takes the version
 out of it, and tries one release asset per hardware:
 
@@ -262,12 +264,12 @@ build in a release is an ordinary 404 rather than a fault, and the run counts
 those as "not published" rather than failed. Only `normal` is fetched, though
 the releases also carry `recovery_` and per-slot assets.
 
-Beta blobs get a `github-` prefix on their filename, so the same version on
-both tracks cannot land on one R2 key. Everything else, hashing, upload and
+Its blobs get a `github-` prefix on their filename, naming where the bytes
+came from, so the same version on both tracks cannot land on one R2 key. Everything else, hashing, upload and
 upsert, is the shared path in `src/downloader.py`.
 
 The two channels are independent: `scheduled` runs each in turn and catches
-whatever the other raises, so an expired dash token cannot cost the beta run
+whatever the other raises, so an expired dash token cannot cost the notion run
 and a changelog that will not parse cannot cost the canonical one.
 
 One hourly cron polls every device on both channels in a single invocation. Hashing is the only
@@ -336,7 +338,8 @@ devices on the canonical build so those requests share the cache entries watches
 have already warmed. Hardware with no row renders as "No build" rather than
 disappearing.
 
-"Core Devices (Beta)" lists the same three watches again on the `beta` track, so
+"Core Devices (Notion)" lists the same three watches again on the `notion`
+track, so
 a watch can appear in more than one group. Results are therefore keyed by
 hardware *and* track; keying on hardware alone would have the two groups render
 each other's build.
