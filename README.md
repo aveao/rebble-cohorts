@@ -209,6 +209,19 @@ the offered version if it is already recorded, and otherwise downloads the
 row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256. All a
 poller does is work out what the newest version for a hardware is.
 
+The upload is skipped when we already hold the bytes. Before storing anything,
+every channel looks for a row whose `sha256` and `size` both match what it just
+downloaded, and points the new row at that object instead. A version that shows
+up on the beta track and later on the canonical one is one file downloaded
+twice, and this keeps it as one object in R2. The download still happens: the
+digest is not known until it does.
+
+Two consequences worth knowing. A row can point at a blob whose filename
+carries another track's prefix, so a canonical row may serve a `github-` URL,
+which `/api/ota/latest` then reports as its `filename`. And rows from before
+the `size` column are never reuse candidates: their length is unknown, so they
+are treated as a mismatch and the blob is uploaded again.
+
 There are two, and they differ only in who they ask:
 
 | | `src/core_dash.py` | `src/memfault.py` |

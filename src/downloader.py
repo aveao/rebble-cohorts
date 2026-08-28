@@ -103,6 +103,7 @@ class Run:
         # is an ordinary outcome, not a fault.
         self.url_guessed = url_guessed
         self.added = 0
+        self.reused = 0
         self.skipped = 0
         self.missing = 0
         self.failed = 0
@@ -134,11 +135,22 @@ class Run:
                 self.fail(hardware, f"{version} download FAILED ({e.status})")
             return
 
-        try:
-            await _upload(self.env, r2_key, data)
-        except Exception as e:  # noqa: BLE001 - R2 surfaces failures as arbitrary JS errors
-            self.fail(hardware, f"{version} upload FAILED ({e})")
-            return
+        # The same bytes reach us more than once: a version published on both
+        # the beta and the canonical track is one file, downloaded twice. If any
+        # row already points at a blob with this digest and length, point the new
+        # row at that object instead of storing a second copy of it. Nothing ever
+        # deletes a blob, so a shared one cannot be pulled out from under a row.
+        stored = await firmware.blob_url(self.env.DB, sha256, len(data))
+        if stored is not None:
+            public_url = stored
+            self.reused += 1
+            self.log(hardware, f"{version} matches a stored blob, not re-uploading")
+        else:
+            try:
+                await _upload(self.env, r2_key, data)
+            except Exception as e:  # noqa: BLE001 - R2 surfaces failures as arbitrary JS errors
+                self.fail(hardware, f"{version} upload FAILED ({e})")
+                return
 
         await firmware.upsert(
             self.env.DB,
@@ -156,12 +168,16 @@ class Run:
         self.log(hardware, f"{version} OK ({len(data)} bytes, {sha256})")
 
     def summary(self):
+        # `reused` is a property of the added rows, not a fifth outcome: they
+        # were published like any other, they just cost no R2 storage.
+        reused = f" ({self.reused} reusing a stored blob)" if self.reused else ""
         print(
-            f"done. {self.added} added, {self.skipped} already present,"
+            f"done. {self.added} added{reused}, {self.skipped} already present,"
             f" {self.missing} not published, {self.failed} failed."
         )
         return {
             "added": self.added,
+            "reused": self.reused,
             "skipped": self.skipped,
             "missing": self.missing,
             "failed": self.failed,

@@ -84,6 +84,26 @@ async def exists(db, hardware, kind, version, source=None):
     return row is not None
 
 
+async def blob_url(db, sha256, size):
+    """The URL of a blob we already store with exactly these bytes, or None.
+
+    The digest is the identity; length is checked alongside it because it costs
+    nothing and a pair that disagreed would mean one of the two is wrong. Rows
+    from before the size column are not candidates: their length is unknown, and
+    re-uploading is the safe way to be wrong.
+
+    Ordered so the answer is the earliest such row rather than an arbitrary one,
+    which keeps repeat runs pointing at the same object.
+    """
+    row = await query_one(
+        db,
+        "SELECT url FROM firmwares WHERE sha256 = ? AND size = ? ORDER BY timestamp, url LIMIT 1",
+        sha256,
+        size,
+    )
+    return row["url"] if row else None
+
+
 async def upsert(
     db, hardware, kind, version, url, sha256, timestamp, notes, source=None, size=None
 ):
