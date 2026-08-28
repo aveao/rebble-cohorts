@@ -290,6 +290,14 @@
       ],
     },
     {
+      title: "Core Devices (Beta)",
+      devices: [
+        { hardware: "asterix", name: "Pebble 2 Duo", source: "beta" },
+        { hardware: "obelix_pvt", name: "Pebble Time 2", source: "beta" },
+        { hardware: "getafix_dvt", name: "Pebble Round 2", stage: "dvt", source: "beta" },
+      ],
+    },
+    {
       title: "Pebble Technology Corp",
       devices: [
         { hardware: "v1_5", name: "Pebble" },
@@ -328,6 +336,8 @@
     if (text !== undefined) node.textContent = text;
     return node;
   };
+
+  const deviceKey = (device) => `${device.hardware} ${device.source ?? ""}`;
 
   async function fetchDevice(device) {
     const params = new URLSearchParams({ select: "fw", hardware: device.hardware });
@@ -423,7 +433,9 @@
     const results = await Promise.all(
       eager.flatMap((group) => group.devices).map(fetchDevice)
     );
-    const byHardware = new Map(results.map((r) => [r.device.hardware, r]));
+    // Keyed by track as well as hardware: the same watch appears in more than
+    // one group when it is listed on both the canonical and a beta track.
+    const byDevice = new Map(results.map((r) => [deviceKey(r.device), r]));
 
     if (results.every((r) => r.offline)) {
       readout.textContent = "offline";
@@ -437,7 +449,7 @@
       section.append(
         group.collapsed
           ? renderReveal(group, section)
-          : renderList(group.devices.map((device) => byHardware.get(device.hardware)))
+          : renderList(group.devices.map((device) => byDevice.get(deviceKey(device))))
       );
       groups.append(section);
     }

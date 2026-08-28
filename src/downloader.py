@@ -18,12 +18,15 @@ from workers import fetch
 import firmware
 from config import var
 
-# Core Devices hardware revisions. These short names are both the `hardware`
-# value we store in the firmwares table and the `hardware_version` string the
-# upstreams expect. Based on the mobileapp WatchHardwarePlatform.
+# Core Devices hardware revisions, polled by every channel. These short names
+# are both the `hardware` value we store in the firmwares table and the
+# `hardware_version` string the upstreams expect. Based on the mobileapp
+# WatchHardwarePlatform.
+#
+# obelix_evt is deliberately absent: nothing publishes builds for it any more.
+# The row it already has stays served, this only stops us asking after it.
 CORE_DEVICES_DEVICES = (
     "asterix",
-    "obelix_evt",
     "obelix_dvt",
     "obelix_pvt",
     "getafix_evt",
@@ -80,7 +83,7 @@ class Run:
     whichever upstream the answer came from.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, source=None, filename_prefix="", url_guessed=False):
         self.env = env
         self.firmware_root = var(env, "FIRMWARE_ROOT")
         self.prefix = var(env, "R2_PREFIX")
@@ -88,8 +91,20 @@ class Run:
         # the Core Devices dash uses it to pick which device it is answering
         # for, so pointing the cron at a different one is a config change.
         self.serial = var(env, "DEVICE_SERIAL")
+        # The build track these rows belong to. None is the canonical firmware,
+        # which is what a /cohort request without ?source= gets.
+        self.source = source
+        # Two tracks can publish the same version for the same hardware without
+        # the two downloads being the same bytes, so a track that is not the
+        # canonical one prefixes its blobs to keep them off each other's key.
+        self.filename_prefix = filename_prefix
+        # Whether the artifact URL was constructed rather than handed to us. A
+        # 404 then means "upstream published no build for this hardware", which
+        # is an ordinary outcome, not a fault.
+        self.url_guessed = url_guessed
         self.added = 0
         self.skipped = 0
+        self.missing = 0
         self.failed = 0
 
     def log(self, hardware, message):
@@ -100,19 +115,23 @@ class Run:
         self.log(hardware, message)
 
     async def publish(self, hardware, version, notes, artifact_url):
-        if await firmware.exists(self.env.DB, hardware, "normal", version):
+        if await firmware.exists(self.env.DB, hardware, "normal", version, self.source):
             self.skipped += 1
             self.log(hardware, f"{version} already in DB, skipping")
             return
 
-        filename = f"Pebble-{version}-{hardware}.pbz"
+        filename = f"{self.filename_prefix}Pebble-{version}-{hardware}.pbz"
         r2_key = f"{self.prefix}{hardware}/{filename}"
         public_url = f"{self.firmware_root}/{hardware}/{filename}"
 
         try:
             data, sha256 = await _download_and_hash(artifact_url)
         except FetchError as e:
-            self.fail(hardware, f"{version} download FAILED ({e.status})")
+            if e.status == 404 and self.url_guessed:
+                self.missing += 1
+                self.log(hardware, f"{version} not published for this hardware")
+            else:
+                self.fail(hardware, f"{version} download FAILED ({e.status})")
             return
 
         try:
@@ -130,11 +149,20 @@ class Run:
             sha256,
             int(time.time()),
             notes,
+            source=self.source,
             size=len(data),
         )
         self.added += 1
         self.log(hardware, f"{version} OK ({len(data)} bytes, {sha256})")
 
     def summary(self):
-        print(f"done. {self.added} added, {self.skipped} already present, {self.failed} failed.")
-        return {"added": self.added, "skipped": self.skipped, "failed": self.failed}
+        print(
+            f"done. {self.added} added, {self.skipped} already present,"
+            f" {self.missing} not published, {self.failed} failed."
+        )
+        return {
+            "added": self.added,
+            "skipped": self.skipped,
+            "missing": self.missing,
+            "failed": self.failed,
+        }

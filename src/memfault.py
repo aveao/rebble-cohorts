@@ -2,9 +2,9 @@
 
 Checks Memfault's releases/latest for each CoreDevice hardware and hands what
 it finds to downloader.Run, which does the storing. This was what the cron ran
-until the Core Devices dash endpoint appeared; core_dash.py has the cron now,
-and this is kept as the fallback the mobile app also treats it as. Wire it back
-up by swapping the import in entry.py.
+until the Core Devices dash endpoint appeared; core_dash.py has the canonical
+track now, and this is kept as the fallback the mobile app also treats it as.
+Wire it back up by adding it to CHANNELS in entry.py.
 """
 
 from urllib.parse import urlencode

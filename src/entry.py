@@ -2,8 +2,14 @@ import asgi
 from js import caches
 from workers import WorkerEntrypoint
 
+import beta
+import core_dash
 from api import app
-from core_dash import fetch_firmware
+
+# The channels the cron polls, in order. core-dash publishes the canonical
+# firmware, the rows a /cohort request without ?source= gets; beta publishes to
+# its own track. They share the R2 bucket and the firmwares table, nothing else.
+CHANNELS = (("core-dash", core_dash.fetch_firmware), ("beta", beta.fetch_firmware))
 
 
 class Default(WorkerEntrypoint):
@@ -30,4 +36,10 @@ class Default(WorkerEntrypoint):
     async def scheduled(self, controller, env, ctx):
         # The `env` argument arrives as None in Python Workers; the bindings are
         # on self.env.
-        await fetch_firmware(self.env)
+        for name, poll in CHANNELS:
+            # One channel failing outright, an expired token or a changelog
+            # that will not parse, must not cost us the other one's run.
+            try:
+                await poll(self.env)
+            except Exception as e:  # noqa: BLE001 - whatever a channel raises, the next still runs
+                print(f"[{name}]: run FAILED ({e})")

@@ -29,6 +29,9 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | `CORE_DASH_API` | var | eng-dash's `/ota/latest` | Override only to point the cron at a stand-in while developing |
 | `MEMFAULT_TOKEN` | secret | none | Memfault project key, needed only by the fallback poller |
 | `MEMFAULT_API` | var | Memfault's public API | Override only to point that poller at a stand-in while developing |
+| `BETA_NOTION_API` | var | the changelog's `loadPageChunk` | Override only to point the beta channel at a stand-in while developing |
+| `BETA_NOTION_PAGE` | var | the changelog page id | Override to read a different Notion page |
+| `BETA_RELEASE_ROOT` | var | PebbleOS release downloads | Override to fetch beta blobs from somewhere else |
 
 ## Local development
 
@@ -167,8 +170,8 @@ Two sources may publish the same version for the same hardware, identity is
 `(hardware, kind, version, source)`, enforced by a unique index over
 `COALESCE(source, '')` because SQLite treats NULLs as distinct.
 
-Nothing writes a non-NULL source yet: the cron still publishes canonical
-rows, and other tracks are populated by hand with
+The cron writes two tracks: core-dash publishes the canonical rows, and the
+beta channel publishes `beta`. Any other track is populated by hand with
 `tools/cli.py submit_firmware --source`.
 
 ### Admin commands
@@ -215,10 +218,46 @@ There are two, and they differ only in who they ask:
 | On the cron | yes | no, kept as a fallback |
 
 `core-dash` is the endpoint CoreApp itself asks first, so it is what the cron
-runs. Memfault is the app's own fallback and stays wired up in the same sense:
-swapping the import in `src/entry.py` is the whole change.
+runs for the canonical track. Memfault is the app's own fallback and stays
+wired up in the same sense: swapping it into `CHANNELS` in `src/entry.py` is
+the whole change.
 
-One hourly cron polls every device in a single invocation. Hashing is the only
+#### The beta channel
+
+`src/beta.py` publishes the `beta` track from the PebbleOS GitHub releases,
+which carry a build for days before it reaches the OTA track our account
+resolves to. It reads the top row of the table on the [PebbleOS
+changelog](https://ndocs.repebble.com/pebbleos-changelog), takes the version
+out of it, and tries one release asset per hardware:
+
+```
+https://github.com/coredevices/PebbleOS/releases/download/<version>/normal_<hardware>_<version>.pbz
+```
+
+The changelog is a Notion page, and needs no token: a published page answers
+`loadPageChunk` unauthenticated, which is the call the site's own frontend
+makes. It does need a plausible `User-Agent`, since Notion's Cloudflare turns
+away the default runtime one.
+
+The version cell is found by matching `v<major>.<minor>[.<patch>][-suffix]`
+rather than by column position, and the notes are taken from the next column
+along. That regex is also the safety boundary: whatever the page says, only
+characters matching it reach the constructed URL.
+
+Because the asset URL is constructed rather than advertised, a hardware with no
+build in a release is an ordinary 404 rather than a fault, and the run counts
+those as "not published" rather than failed. Only `normal` is fetched, though
+the releases also carry `recovery_` and per-slot assets.
+
+Beta blobs get a `github-` prefix on their filename, so the same version on
+both tracks cannot land on one R2 key. Everything else, hashing, upload and
+upsert, is the shared path in `src/downloader.py`.
+
+The two channels are independent: `scheduled` runs each in turn and catches
+whatever the other raises, so an expired dash token cannot cost the beta run
+and a changelog that will not parse cannot cost the canonical one.
+
+One hourly cron polls every device on both channels in a single invocation. Hashing is the only
 part that costs meaningful CPU, and it only happens for a version that is
 actually new, so a run where nothing has been published does almost no work.
 
@@ -283,6 +322,11 @@ device, exactly the request a watch makes, and omits `&source=` entirely for
 devices on the canonical build so those requests share the cache entries watches
 have already warmed. Hardware with no row renders as "No build" rather than
 disappearing.
+
+"Core Devices (Beta)" lists the same three watches again on the `beta` track, so
+a watch can appear in more than one group. Results are therefore keyed by
+hardware *and* track; keying on hardware alone would have the two groups render
+each other's build.
 
 Adding hardware, or pointing a device at a build track, means editing `GROUPS`
 in that file.
