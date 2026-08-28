@@ -24,11 +24,13 @@ import click
 VALID_FW_KINDS = ("normal", "recovery")
 DEFAULT_FIRMWARE_ROOT = "https://cohorts-storage.lavate.ch/fw"
 
-UPSERT = """INSERT INTO firmwares (hardware, kind, version, url, sha256, timestamp, notes, source)
+UPSERT = """INSERT INTO firmwares
+    (hardware, kind, version, url, sha256, timestamp, notes, source, size)
 VALUES ({values})
 ON CONFLICT (hardware, kind, version, COALESCE(source, '')) DO UPDATE SET
     url = excluded.url, sha256 = excluded.sha256,
-    timestamp = excluded.timestamp, notes = excluded.notes;"""
+    timestamp = excluded.timestamp, notes = excluded.notes,
+    size = excluded.size;"""
 
 
 def _literal(value):
@@ -39,9 +41,9 @@ def _literal(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def _upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source=None):
+def _upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source=None, size=None):
     values = ", ".join(
-        _literal(v) for v in (hardware, kind, version, url, sha256, timestamp, notes, source)
+        _literal(v) for v in (hardware, kind, version, url, sha256, timestamp, notes, source, size)
     )
     return UPSERT.format(values=values)
 
@@ -95,13 +97,20 @@ def import_json_command(firmware_root, config_path):
     help="Build track, e.g. 'beta'. Omit for the canonical firmware, which is what "
     "/cohort serves when no ?source= is given.",
 )
-def submit_firmware_command(hardware, kind, version, url, sha256, timestamp, notes, source):
+@click.option(
+    "--size",
+    type=int,
+    default=None,
+    help="Size of the .pbz in bytes, reported as file_size by /api/ota/latest. "
+    "Omit if unknown; the client ignores the field.",
+)
+def submit_firmware_command(hardware, kind, version, url, sha256, timestamp, notes, source, size):
     """Add or update a single firmware row."""
     if kind not in VALID_FW_KINDS:
         raise click.BadParameter(f"kind must be one of {VALID_FW_KINDS}, got {kind!r}")
     if timestamp is None:
         timestamp = int(time.time())
-    click.echo(_upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source))
+    click.echo(_upsert_sql(hardware, kind, version, url, sha256, timestamp, notes, source, size))
 
 
 if __name__ == "__main__":

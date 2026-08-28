@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 import firmware
+import ota
 
 # s-maxage caches at the edge for five minutes; max-age=0 leaves clients
 # uncached, so watches keep asking and only the edge holds a copy. Firmware
@@ -12,8 +13,9 @@ import firmware
 # release can sit unseen behind a cached response.
 CACHE_CONTROL = "public, max-age=0, s-maxage=300"
 
-# No docs routes: this API has three endpoints and no consumer for a schema, and
-# keeping them out spares the route table and the deploy-time snapshot.
+# No docs routes: this API has a handful of endpoints and no consumer for a
+# schema, and keeping them out spares the route table and the deploy-time
+# snapshot.
 app = FastAPI(
     title="cohorts",
     description="The Rebble cohorts API",
@@ -104,6 +106,49 @@ async def cohort(
     # rows of fw-all. The Cache-Control header is what opts this response into
     # the edge cache in entry.py.
     return JSONResponse(response, headers={"Cache-Control": CACHE_CONTROL})
+
+
+@app.get("/api/ota/latest")
+@app.get("/ota/latest")
+async def ota_latest(
+    request: Request,
+    hardware_version: str | None = None,
+    device_serial: str | None = None,
+    current_version: str | None = None,
+    source: str | None = None,
+):
+    """The eng-dash update check, answered from our own rows.
+
+    Both paths are registered because the client appends /ota/latest to a base
+    URL it is built with, and that base may or may not carry the /api the
+    production one has.
+
+    Unauthenticated by design. The real endpoint wants a Firebase ID token, but
+    every install carries one anonymously, so it separates nobody from nobody;
+    we have nothing to authorise against and no account to resolve a track
+    from, so an Authorization header is ignored rather than rejected.
+    device_serial is accepted and ignored for the same reason, and unlike
+    upstream it is not required: refusing a request over a field we never read
+    would only turn into an UpdateCheckFailed and a fallback.
+
+    `source` is ours rather than eng-dash's, and picks a build track the way it
+    does on /cohort. Absent means the canonical firmware.
+    """
+    if not hardware_version:
+        raise HTTPException(400)
+
+    db = request.scope["env"].DB
+    rows = await firmware.latest_by_kind(db, hardware_version, ("normal",), source)
+    row = rows.get("normal")
+
+    # 204 is "nothing to offer", which covers both having no build for this
+    # hardware and the watch already running the one we have. Hardware we do
+    # not know is not an error here: a 400 would read as UpdateCheckFailed to
+    # the client, which is a louder thing to say than "no update".
+    if row is None or ota.normalise(current_version) == ota.normalise(row["version"]):
+        return Response(status_code=204)
+
+    return JSONResponse(ota.offer(row, current_version), headers={"Cache-Control": CACHE_CONTROL})
 
 
 @app.get("/heartbeat")

@@ -8,16 +8,17 @@ the two cases share one query.
 
 from d1 import execute, query, query_one
 
-COLUMNS = "hardware, kind, version, url, sha256, timestamp, notes, source"
+COLUMNS = "hardware, kind, version, url, sha256, timestamp, notes, source, size"
 
 UPSERT = f"""
 INSERT INTO firmwares ({COLUMNS})
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (hardware, kind, version, COALESCE(source, '')) DO UPDATE SET
     url = excluded.url,
     sha256 = excluded.sha256,
     timestamp = excluded.timestamp,
-    notes = excluded.notes
+    notes = excluded.notes,
+    size = excluded.size
 """
 
 
@@ -83,5 +84,7 @@ async def exists(db, hardware, kind, version, source=None):
     return row is not None
 
 
-async def upsert(db, hardware, kind, version, url, sha256, timestamp, notes, source=None):
-    await execute(db, UPSERT, hardware, kind, version, url, sha256, timestamp, notes, source)
+async def upsert(
+    db, hardware, kind, version, url, sha256, timestamp, notes, source=None, size=None
+):
+    await execute(db, UPSERT, hardware, kind, version, url, sha256, timestamp, notes, source, size)

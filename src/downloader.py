@@ -130,6 +130,7 @@ class Run:
             sha256,
             int(time.time()),
             notes,
+            size=len(data),
         )
         self.added += 1
         self.log(hardware, f"{version} OK ({len(data)} bytes, {sha256})")
