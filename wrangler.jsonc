@@ -53,10 +53,13 @@
     }
   ],
 
-  // Hourly, polling every CoreDevice in the one invocation. Keep the interval
-  // at an hour or longer: cron invocations at shorter intervals are capped at
-  // 30s CPU, while >=1h gets 15 minutes.
+  // Hourly, polling every CoreDevice on every channel in the one invocation.
+  // Keep the interval at an hour or longer: cron invocations at shorter
+  // intervals are capped at 30s CPU, while >=1h gets 15 minutes.
+  //
+  // At :30 rather than :00, off the top-of-hour crowd every other scheduled
+  // Worker is in. Nothing here cares which minute of the hour it runs.
   "triggers": {
-    "crons": ["0 * * * *"]
+    "crons": ["30 * * * *"]
   }
 }
