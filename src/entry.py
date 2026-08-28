@@ -2,9 +2,8 @@ import asgi
 from js import caches
 from workers import WorkerEntrypoint
 
-import core_dash
-import notion
 from api import app
+from downloader import core_dash, notion
 
 # The channels the cron polls, in order. core-dash publishes the canonical
 # firmware, the rows a /cohort request without ?source= gets; the other two

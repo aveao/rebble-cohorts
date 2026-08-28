@@ -213,12 +213,13 @@ not on request.
 
 ### Fetching CoreDevice firmware
 
-`src/downloader.py` holds everything the pollers share. For a device it skips
-the offered version if it is already recorded, and otherwise downloads the
-`.pbz` while hashing it, uploads it to R2 at
-`{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal`
-row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256. All a
-poller does is work out what the newest version for a hardware is.
+`src/downloader/` holds the channels, and its `__init__.py` holds everything
+they share. For a device it skips the offered version if it is already
+recorded, and otherwise downloads the `.pbz` while hashing it, uploads it to R2
+at `{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a
+`normal` row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed
+sha256. All a poller does is work out what the newest version for a hardware
+is.
 
 The upload is skipped when we already hold the bytes. Before storing anything,
 every channel looks for a row whose `sha256` and `size` both match what it just
@@ -235,7 +236,7 @@ are treated as a mismatch and the blob is uploaded again.
 
 There are two, and they differ only in who they ask:
 
-| | `src/core_dash.py` | `src/memfault.py` |
+| | `downloader/core_dash.py` | `downloader/memfault.py` |
 | --- | --- | --- |
 | Upstream | `dash.repebble.com/api/ota/latest` | `api.memfault.com/api/v0/releases/latest` |
 | Auth | anonymous Firebase ID token | project key |
@@ -252,7 +253,7 @@ the whole change.
 
 #### The beta track
 
-`core_dash.py` runs twice per cron, over two accounts. eng-dash chooses the
+`downloader/core_dash.py` runs twice per cron, over two accounts. eng-dash chooses the
 release by the asking account's own track, so a second anonymous account
 enrolled in the beta programme is offered beta builds from the identical
 request, and its rows land on `beta`. Mint it exactly as the first one and set
@@ -270,7 +271,7 @@ its `sha256` no longer describes.
 
 #### The notion channel
 
-`src/notion.py` publishes the `notion` track from the PebbleOS GitHub
+`downloader/notion.py` publishes the `notion` track from the PebbleOS GitHub
 releases, which carry a build for days before it reaches the OTA track our
 account resolves to. The track is named for where the version comes from
 rather than for how stable it is: these are the published releases, they just
@@ -299,7 +300,7 @@ the releases also carry `recovery_` and per-slot assets.
 
 Its blobs get a `github-` prefix on their filename, naming where the bytes
 came from, so the same version on both tracks cannot land on one R2 key. Everything else, hashing, upload and
-upsert, is the shared path in `src/downloader.py`.
+upsert, is the shared path in `src/downloader/__init__.py`.
 
 The two channels are independent: `scheduled` runs each in turn and catches
 whatever the other raises, so an expired dash token cannot cost the notion run
