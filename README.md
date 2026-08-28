@@ -4,7 +4,7 @@ cohorts.rebble.io: The Rebble cohorts API. It handles firmware delivery.
 
 Runs as a Cloudflare Python Worker: FastAPI behind the runtime's ASGI adapter,
 D1 for firmware metadata, R2 for the firmware blobs, and a cron trigger for the
-Memfault poll.
+CoreDevice firmware poll.
 
 For archival, use `/cohort?select=fw-all`, which returns a list of all stored firmware.
 
@@ -19,8 +19,12 @@ For local development, copy `.dev.vars.example` to `.dev.vars`.
 | `BINARIES` | R2 binding | none | Bucket holding the `.pbz` blobs |
 | `FIRMWARE_ROOT` | var | `https://cohorts-storage.lavate.ch/fw` | Public base URL recorded in firmware rows; must resolve to the R2 bucket's custom domain |
 | `R2_PREFIX` | var | `fw/` | Key prefix inside the bucket (must line up with the tail of `FIRMWARE_ROOT`) |
-| `MEMFAULT_TOKEN` | secret | none | Memfault project key, required by the cron |
-| `MEMFAULT_API` | var | Memfault's public API | Override only to point the cron at a stand-in while developing |
+| `DEVICE_SERIAL` | var | `REBBLE_COHORTS_CRON` | Serial the cron reports upstream; the Core Devices dash answers per device, so it picks which build we are offered |
+| `CORE_DASH_REFRESH_TOKEN` | secret | none | Refresh token for an anonymous Firebase account, required by the cron |
+| `CORE_DASH_FIREBASE_KEY` | var | CoreApp's key | Firebase Web API key for project `coreapp-ce061`, a public client identifier rather than a secret |
+| `CORE_DASH_API` | var | eng-dash's `/ota/latest` | Override only to point the cron at a stand-in while developing |
+| `MEMFAULT_TOKEN` | secret | none | Memfault project key, needed only by the fallback poller |
+| `MEMFAULT_API` | var | Memfault's public API | Override only to point that poller at a stand-in while developing |
 
 ## Local development
 
@@ -47,7 +51,7 @@ curl http://localhost:8787/cdn-cgi/handler/scheduled
 npx wrangler r2 bucket create cohorts
 uv run pywrangler deploy                           # provisions the D1 database
 npx wrangler d1 migrations apply cohorts --remote
-npx wrangler secret put MEMFAULT_TOKEN
+npx wrangler secret put CORE_DASH_REFRESH_TOKEN
 ```
 
 The D1 binding carries no `database_id`, so the first deploy creates the
@@ -63,7 +67,7 @@ recorded in the database resolve to the blobs the cron uploads.
 
 Workers Builds ships Node and Python but no uv, which pywrangler requires, so
 both commands have to be set, the default deploy command does not work here.
-Plain `npx wrangler deploy` succeeds but uploads only the five source files
+Plain `npx wrangler deploy` succeeds but uploads only the source files
 without the vendored dependencies, producing a Worker that fails at runtime.
 
 | Setting | Value |
@@ -75,9 +79,10 @@ without the vendored dependencies, producing a Worker that fails at runtime.
 Migrations are not part of a deploy. Either apply them from your machine, or
 chain them ahead of the deploy: `uv run pywrangler d1 migrations apply cohorts
 --remote && uv run pywrangler deploy`, the tracking table makes it a no-op when
-there is nothing new. Secrets are not build variables: set `MEMFAULT_TOKEN` with
-`wrangler secret put` or in the dashboard. On dashboard deploys, a provisioned
-D1 id is visible in the dashboard rather than written back to the repository.
+there is nothing new. Secrets are not build variables: set
+`CORE_DASH_REFRESH_TOKEN` with `wrangler secret put` or in the dashboard. On
+dashboard deploys, a provisioned D1 id is visible in the dashboard rather than
+written back to the repository.
 
 ## Firmware data
 
@@ -108,8 +113,8 @@ Two sources may publish the same version for the same hardware, identity is
 `(hardware, kind, version, source)`, enforced by a unique index over
 `COALESCE(source, '')` because SQLite treats NULLs as distinct.
 
-Nothing writes a non-NULL source yet: the Memfault cron still publishes
-canonical rows, and other tracks are populated by hand with
+Nothing writes a non-NULL source yet: the cron still publishes canonical
+rows, and other tracks are populated by hand with
 `tools/cli.py submit_firmware --source`.
 
 ### Admin commands
@@ -138,13 +143,26 @@ Both build URLs from `--firmware-root` (default `https://cohorts-storage.lavate.
 so make sure it matches the Worker's `FIRMWARE_ROOT`. URLs are formed on insert,
 not on request.
 
-### Fetching CoreDevice firmware from Memfault
+### Fetching CoreDevice firmware
 
-`src/memfault.py` holds the logic. For a device it checks Memfault's
-`releases/latest`, skips the version if already recorded, and otherwise
-downloads the `.pbz` while hashing it, uploads it to R2 at
+`src/downloader.py` holds everything the pollers share. For a device it skips
+the offered version if it is already recorded, and otherwise downloads the
+`.pbz` while hashing it, uploads it to R2 at
 `{R2_PREFIX}{hardware}/Pebble-{version}-{hardware}.pbz`, and upserts a `normal`
-row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256.
+row with the resulting `{FIRMWARE_ROOT}/…` URL and the computed sha256. All a
+poller does is work out what the newest version for a hardware is.
+
+There are two, and they differ only in who they ask:
+
+| | `src/core_dash.py` | `src/memfault.py` |
+| --- | --- | --- |
+| Upstream | `dash.repebble.com/api/ota/latest` | `api.memfault.com/api/v0/releases/latest` |
+| Auth | anonymous Firebase ID token | project key |
+| On the cron | yes | no, kept as a fallback |
+
+`core-dash` is the endpoint CoreApp itself asks first, so it is what the cron
+runs. Memfault is the app's own fallback and stays wired up in the same sense:
+swapping the import in `src/entry.py` is the whole change.
 
 One hourly cron polls every device in a single invocation. Hashing is the only
 part that costs meaningful CPU, and it only happens for a version that is
@@ -158,6 +176,35 @@ Trigger a run locally:
 ```
 curl http://localhost:8787/cdn-cgi/handler/scheduled
 ```
+
+#### The anonymous Firebase credential
+
+eng-dash requires a Firebase ID token for project `coreapp-ce061` and accepts an
+anonymous one, which is why the endpoint is often described as needing no auth:
+CoreApp signs in anonymously whenever nobody is logged in, so every install
+carries a valid token.
+
+ID tokens last an hour, the same as the cron interval, so there is nothing worth
+caching between runs. What we store is the refresh token of a single anonymous
+account, minted once by hand; every run exchanges it at
+`securetoken.googleapis.com` for a fresh ID token. Refresh tokens do not expire,
+and a Worker cannot write to its own env, so the rotated one Firebase hands back
+is ignored.
+
+Mint the account once and take `refreshToken` from the response:
+
+```
+curl -sS -X POST \
+  "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$CORE_DASH_FIREBASE_KEY" \
+  -H 'Content-Type: application/json' -d '{"returnSecureToken":true}'
+npx wrangler secret put CORE_DASH_REFRESH_TOKEN
+```
+
+A failure to refresh raises rather than being counted per device: without a
+token every lookup 401s, so there is no point reporting it six times. Note that
+the release eng-dash serves is chosen by the account's track together with
+`DEVICE_SERIAL`, so a different account or serial can be offered a different
+build.
 
 ### Migrations
 

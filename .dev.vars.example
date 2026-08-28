@@ -2,8 +2,17 @@
 # values with `npx wrangler secret put <NAME>` (secrets) or in wrangler.jsonc
 # (vars).
 
-# Memfault project key, required by the cron.
+# Refresh token for an anonymous Firebase account in the coreapp project,
+# required by the cron. Mint one with the accounts:signUp call in the README.
+CORE_DASH_REFRESH_TOKEN=
+
+# Memfault project key. Only needed if you point the cron back at memfault.py.
 MEMFAULT_TOKEN=
 
-# Optional: point the cron at a stand-in Memfault while developing.
+# Optional: the serial the cron reports upstream. The Core Devices dash answers
+# per device, so this picks which build we are offered.
+# DEVICE_SERIAL=REBBLE_COHORTS_CRON
+
+# Optional: point a poller at a stand-in upstream while developing.
+# CORE_DASH_API=http://127.0.0.1:5005/api/ota/latest
 # MEMFAULT_API=http://127.0.0.1:5004/api/v0/releases/latest

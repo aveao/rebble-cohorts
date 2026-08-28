@@ -3,7 +3,7 @@ from js import caches
 from workers import WorkerEntrypoint
 
 from api import app
-from memfault import fetch_firmware
+from core_dash import fetch_firmware
 
 
 class Default(WorkerEntrypoint):
