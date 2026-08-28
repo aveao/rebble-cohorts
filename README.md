@@ -128,19 +128,29 @@ accepted and ignored for the same reason, and unlike upstream it is not
 required: refusing a request over a field we never read would only turn into an
 `UpdateCheckFailed` and a fallback.
 
-The two responses:
+A build is offered only to a watch strictly behind it, which is what eng-dash
+itself does. Measured against the live endpoint for a device on v4.33.2: 200
+for v4.33.1, 204 for v4.33.2, and 204 for v4.33.3 and everything above,
+including versions that exist nowhere. It is an ordering, not a lookup.
 
-- **204** when there is nothing to offer, which covers both having no `normal`
-  row for the hardware and the watch already running the one we have. This
-  matters more than it looks: on a 200 the client does not compare versions, it
-  installs what it is handed, so "already current" has to be a 204 rather than
-  the version it is already on. Unknown hardware is a 204 too, not a 400, since
-  anything that is not 200 or 204 reads as `UpdateCheckFailed`.
-- **200** with the newest `normal` row otherwise. `is_downgrade` is worked out
-  by comparing what we are about to offer against `current_version`, because
-  the client refuses an older build unless the response says it may take one.
-  Rollback in cohorts is exactly that, an older version published with a newer
-  timestamp, so without the flag a rollback would be offered and then refused.
+- **200** with the newest `normal` row when `current_version` is older than it,
+  absent (a watch in recovery sends none), or unparseable. This matters more
+  than it looks: on a 200 the client does not compare versions, it installs
+  what it is handed.
+- **204** otherwise, which covers having no `normal` row for the hardware and
+  any watch at or above what we hold. Unknown hardware is a 204 too, not a 400,
+  since anything that is not 200 or 204 reads as `UpdateCheckFailed`.
+
+Matching that rule matters because the tracks disagree with each other. A watch
+that took a newer build from the beta or notion track and then asks on the
+canonical one is left alone; offering it our older row would roll it back,
+silently, because this endpoint is authoritative. `is_downgrade` is therefore
+always false: we never hand back something older than what the watch runs, so
+we never need permission to. The cost is that a deliberate rollback cannot be
+pushed through this endpoint either.
+
+The `-suffix` is not ordered, so `v4.33.2-beta1` counts as `v4.33.2` and is not
+offered the plain build. There is no total order over free text.
 
 Every field the real endpoint sends is sent, including the ones the client
 documents as ignoring, since it deserialises the whole object and a field
@@ -232,7 +242,11 @@ There are two, and they differ only in who they ask:
 | On the cron | yes | no, kept as a fallback |
 
 `core-dash` is the endpoint CoreApp itself asks first, so it is what the cron
-runs for the canonical track. Memfault is the app's own fallback and stays
+runs for the canonical track. It sends the newest version we already hold for
+that hardware on that track as `current_version`, so eng-dash decides there is
+nothing to do and answers 204 rather than handing us an offer we would only
+throw away. With nothing stored it sends nothing, the recovery shape, and takes
+whatever the account is on. Memfault is the app's own fallback and stays
 wired up in the same sense: swapping it into `CHANNELS` in `src/entry.py` is
 the whole change.
 

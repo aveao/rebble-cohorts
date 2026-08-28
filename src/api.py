@@ -141,14 +141,14 @@ async def ota_latest(
     rows = await firmware.latest_by_kind(db, hardware_version, ("normal",), source)
     row = rows.get("normal")
 
-    # 204 is "nothing to offer", which covers both having no build for this
-    # hardware and the watch already running the one we have. Hardware we do
+    # 204 is "nothing to offer", which covers having no build for this hardware
+    # and any watch that is not strictly behind the one we have. Hardware we do
     # not know is not an error here: a 400 would read as UpdateCheckFailed to
     # the client, which is a louder thing to say than "no update".
-    if row is None or ota.normalise(current_version) == ota.normalise(row["version"]):
+    if row is None or not ota.should_offer(row["version"], current_version):
         return Response(status_code=204)
 
-    return JSONResponse(ota.offer(row, current_version), headers={"Cache-Control": CACHE_CONTROL})
+    return JSONResponse(ota.offer(row), headers={"Cache-Control": CACHE_CONTROL})
 
 
 @app.get("/heartbeat")

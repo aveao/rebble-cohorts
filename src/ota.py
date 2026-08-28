@@ -20,15 +20,6 @@ import re
 VERSION = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?(?:-(.*))?$")
 
 
-def normalise(value):
-    """A version tag without its optional `v`, for comparing two of them.
-
-    The client v-prefixes `current_version` on the way out, so what it sends
-    and what we store can differ by nothing but that.
-    """
-    return value.strip().removeprefix("v") if value else ""
-
-
 def parse(value):
     """(major, minor, patch) for a version tag, or None if it does not parse.
 
@@ -39,19 +30,38 @@ def parse(value):
     return tuple(int(part or 0) for part in match.groups()[:3]) if match else None
 
 
-def is_downgrade(offered, current):
-    """Whether `offered` is an older build than the one the watch reports.
+def should_offer(offered, current):
+    """Whether to hand `offered` to a watch reporting `current`.
 
-    False whenever either side is missing or unparseable, including the PRF
-    shape where the client sends no current_version at all: a watch in recovery
-    flashes whatever it is given, and guessing here could only ever withhold
-    permission the client turns out to need.
+    eng-dash offers a build only when the caller is strictly behind it and goes
+    quiet at or above, which was measured against the live endpoint across the
+    boundary: for a device on v4.33.2 it answered 200 for v4.33.1 and 204 for
+    v4.33.3 and everything above, versions that exist nowhere included. It is
+    an ordering, not a lookup, and we match it.
+
+    Matching matters because the tracks disagree. A watch that took a newer
+    build from another track and then asks the canonical endpoint is left
+    alone, where offering it our older row would roll it back: this endpoint is
+    authoritative, so the client installs whatever a 200 carries.
+
+    Two cases are offered rather than withheld. A watch in recovery sends no
+    current_version at all and flashes whatever it is given. And a version
+    neither side can parse cannot be ordered, so it is treated as behind:
+    never updating a watch we cannot read is the worse failure.
+
+    The -suffix is not ordered, so v4.33.2-beta1 counts as v4.33.2 and is not
+    offered the plain build. There is no total order over free text, and
+    guessing one would be how a watch gets moved sideways by accident.
     """
+    if not current:
+        return True
     new, old = parse(offered), parse(current)
-    return new is not None and old is not None and new < old
+    if new is None or old is None:
+        return True
+    return old < new
 
 
-def offer(row, current_version=None):
+def offer(row):
     """One firmware row as an /ota/latest 200 body.
 
     Every field the real endpoint sends is sent, including the ones the client
@@ -63,7 +73,10 @@ def offer(row, current_version=None):
         "version": version,
         "display_name": version,
         "notes": row["notes"],
-        "is_downgrade": is_downgrade(version, current_version),
+        # Always false: should_offer only lets a build through to a watch that
+        # is behind it, so we never hand back something older than what the
+        # watch runs and never need permission to.
+        "is_downgrade": False,
         # We have no notion of a release that must be installed on the way
         # past, and the client ignores the flag anyway.
         "must_pass_through": False,

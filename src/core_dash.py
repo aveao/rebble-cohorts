@@ -25,16 +25,19 @@ Two differences from Memfault worth knowing about:
   same as the Memfault path. That is what makes a Core Devices downgrade work
   by itself: `latest` here is newest-timestamp, so a version that goes
   backwards upstream still wins on the way out.
-- The endpoint is authoritative about what to install, and answers 204 when the
-  caller is already current. We never send `current_version`, so it always
-  offers the newest build on this account's track and the D1 check decides
-  whether it is new to us.
+- The endpoint is authoritative about what to install, and offers a build only
+  when the caller is strictly behind it. We send the newest version we already
+  hold for that hardware on that track as `current_version`, so eng-dash itself
+  decides there is nothing to do and answers 204, rather than us fetching an
+  offer we would only throw away. With nothing stored we send nothing, which is
+  the recovery shape, and are offered whatever the account is on.
 """
 
 from urllib.parse import urlencode
 
 from workers import fetch
 
+import firmware
 from config import var
 from downloader import CORE_DEVICES_DEVICES, FetchError, Run
 
@@ -73,8 +76,22 @@ async def _id_token(api_key, refresh_token):
     return (await resp.json())["id_token"]
 
 
-async def _fetch_latest(api, token, hw_revision, serial):
-    query = urlencode({"hardware_version": hw_revision, "device_serial": serial})
+async def _current_version(db, hardware, source):
+    """The newest `normal` version we hold for this hardware on this track.
+
+    None when we hold nothing, which is the recovery shape and gets us whatever
+    the account is offered.
+    """
+    rows = await firmware.latest_by_kind(db, hardware, ("normal",), source)
+    row = rows.get("normal")
+    return row["version"] if row else None
+
+
+async def _fetch_latest(api, token, hw_revision, serial, current_version=None):
+    query = {"hardware_version": hw_revision, "device_serial": serial}
+    if current_version:
+        query["current_version"] = current_version
+    query = urlencode(query)
     resp = await fetch(f"{api}?{query}", headers={"Authorization": f"Bearer {token}"})
     if resp.status == 204:
         return None
@@ -121,14 +138,15 @@ async def _poll(env, token_var, source=None, filename_prefix="", required=True):
 
     run = Run(env, source=source, filename_prefix=filename_prefix)
     for hardware in CORE_DEVICES_DEVICES:
+        current = await _current_version(env.DB, hardware, source)
         try:
-            info = await _fetch_latest(api, token, hardware, run.serial)
+            info = await _fetch_latest(api, token, hardware, run.serial, current)
         except FetchError as e:
             run.fail(hardware, f"lookup FAILED ({e.status})")
             continue
 
         if info is None:
-            run.log(hardware, "no update available")
+            run.log(hardware, f"no update available (we hold {current or 'nothing'})")
             continue
 
         artifact_url = _artifact_url(info, hardware)
